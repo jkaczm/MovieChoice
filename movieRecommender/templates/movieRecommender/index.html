@@ -1,1 +1,75 @@
-<h1>Hello World</h1>
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>MovieChoice</title>
+    <script src="https://code.jquery.com/jquery-1.10.2.js"></script>
+</head>
+
+<body>
+    <h1>Test Page</h1>
+    <button id="btn">Click Me</button>
+    <button id="btn2">Button To test Json</button>
+    <button id="btn-for-ids">Get Movie Ids</button>
+    <button id="get-recommendations">Get Recommendations</button>
+    <div id="output"></div>
+    <script>
+
+        var testVariable = " hello, I'm a test";
+
+        $("#btn").click(function () {
+            $("#output").html("Button Was Clicked!");
+            $.get("/movieRecommender/getMovieIds", {
+                    name: "John",
+                    time: "2pm"
+                })
+                .done(function (data) {
+                    alert("Data Loaded: " + data + testVariable);
+                });
+        });
+
+        $("#btn2").click(function () {
+            $("#output").html("Button to test JSON Was Clicked!");
+            var x = { movies : [] };
+            x["movies"][0] = { movieId : 1, rating : 4};
+            x["movies"][1] = { movieId : 2, rating : 2.5};
+            console.log(JSON.stringify(x));
+
+            $.get("/movieRecommender/testJson", { 
+                JSON : JSON.stringify(x),
+                })
+                .done(function (data) {
+                    parsedData = JSON.parse(data);
+                    alert("Data Loaded: " + parsedData[0]);
+                });
+        });
+
+        $("#btn-for-ids").click(function () {
+            $.get("/movieRecommender/getMovieIds")
+                .done(function (data) {
+                    movieIds = JSON.parse(data);
+                    $("#output").html(data);
+                });
+        });
+
+        $("#get-recommendations").click(function () {
+            var userData = [];
+            userData[0] = [1,2];
+            userData[1] = [3,4];
+
+
+            $.get("/movieRecommender/getRecommendations", { 
+                JSON : JSON.stringify(userData),
+                })
+                .done(function (data) {
+                    recommendations = JSON.parse(data);
+                    $("#output").html(recommendations);
+                });
+        });
+    </script>
+</body>
+
+</html>
