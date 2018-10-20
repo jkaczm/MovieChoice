@@ -3,6 +3,7 @@ from django.http import HttpResponse
 import sqlite3
 import json
 import time
+from math import sqrt
 
 def app(request):
     #conn = sqlite3.connect('movieRecommender.db')
@@ -55,7 +56,12 @@ def getRecommendations(request):
     print("The average movie rating of user:", user_avg_rating)
 
     # variable to store list of movies user has rated
-    movies_rated_by_user = [str(rating[0]) for rating in user_data]
+    movies_rated_by_user = [str(rating[0]) for rating in user_data] 
+
+    # variable to store dictionary of ratings
+    user_dict = dict(zip([rating[0] for rating in user_data],[rating[1] for rating in user_data]))
+    # print for testing purposes
+    print("The dictionary of user data:", user_dict)
 
     # list of user's who have rated movies in common
     cur.execute("""SELECT userId FROM ratings WHERE movieId IN %s""" % str(tuple(movies_rated_by_user)))
@@ -76,7 +82,7 @@ def getRecommendations(request):
 
     for movie in movies_to_iterate_over:
         # variable to hold the predicted rating of the movie
-        predicted_rating = 0
+        predicted_rating_numerator = 0
         # variable to hold the sum of the absolute value of pearson correlation for the denominator of formula
         sum_of_pearson_correlation = 0
         # variable to hold the value of the numerator of formula
@@ -97,20 +103,38 @@ def getRecommendations(request):
 
         # for each user to iterate over
         for user in users_to_iterate_over:
+            # compute average rating
             cur.execute("""SELECT AVG(rating) FROM ratings WHERE userId=?""", user)
             avg_rating = cur.fetchall()[0][0]
-            # print for testing purposes
-            # print("UserId: ", user, "Average rating: ", avg_rating)
-            pass
-        
+            # get movies user has rated
+            cur.execute("""SELECT movieId, rating FROM ratings WHERE userId=?""", user)
+            # create a dictionary where movieId is key and rating is value
+            dict_of_movies_user_in_database_has_rated = dict(cur.fetchall())
+            # use list of movies in common to compute pearson correlation
+            temp_pearson_numerator = 0
+            temp_pearson_denom_left = 0
+            temp_pearson_denom_right = 0
+            for key in user_dict:
+                if str(key) in dict_of_movies_user_in_database_has_rated:
+                    x = user_dict[key] - user_avg_rating
+                    y = int(float(dict_of_movies_user_in_database_has_rated[str(key)])) - avg_rating
+                    temp_pearson_numerator += x * y
+                    temp_pearson_denom_left += x * x
+                    temp_pearson_denom_right += y * y
+            pearson_correlation = temp_pearson_numerator / (sqrt(temp_pearson_denom_left) * sqrt(temp_pearson_denom_right))
+            sum_of_pearson_correlation += abs(pearson_correlation)
+            predicted_rating_numerator += pearson_correlation * (int(float(dict_of_movies_user_in_database_has_rated[movie[0]])) - avg_rating)
+
+        # compute predicted rating
+        predicted_rating = user_avg_rating + (predicted_rating_numerator / sum_of_pearson_correlation)
+        # print for testing purposes
+        print("The predicted rating for movie", movie[0], "is", predicted_rating)
+
         # if either 20 movies were considered for review or the program is taking longer than 10 seconds, quit
         count += 1
-        if(count == 20 or (time.time() - start_time > 10)):
+        if(count == 20 or (time.time() - start_time > 20)):
             break
 
-
-
-    
     # close database connection 
     conn.close()
 
