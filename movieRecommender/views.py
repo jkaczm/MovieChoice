@@ -4,6 +4,7 @@ import sqlite3
 import json
 import time
 from math import sqrt
+import heapq
 
 def app(request):
     #conn = sqlite3.connect('movieRecommender.db')
@@ -33,6 +34,11 @@ def testJsonRequest(request):
     return HttpResponse(asString)
 
 def getRecommendations(request):
+    # print for testing purposes
+    print("*********************************************************")
+    print("The algorithm begins execution")
+    print("*********************************************************")
+
     # get starting time of function
     start_time = time.time()
 
@@ -75,8 +81,9 @@ def getRecommendations(request):
     # print for testing purposes
     print("The number of possible movies to iterate over:", len(movies_to_iterate_over))
 
-    # Priority queue of movies to recommend
+    # heap of movies to recommend
     movies_to_recommend = []
+
     # count to keep track of how many movies were considered for recommendation
     count = 0
 
@@ -121,26 +128,53 @@ def getRecommendations(request):
                     temp_pearson_numerator += x * y
                     temp_pearson_denom_left += x * x
                     temp_pearson_denom_right += y * y
-            pearson_correlation = temp_pearson_numerator / (sqrt(temp_pearson_denom_left) * sqrt(temp_pearson_denom_right))
+            try:
+                pearson_correlation = temp_pearson_numerator / (sqrt(temp_pearson_denom_left) * sqrt(temp_pearson_denom_right))
+            except ArithmeticError:
+                # print for testing purposes
+                print("Division by Zero Exception")
+                pearson_correlation = 0
+
             sum_of_pearson_correlation += abs(pearson_correlation)
             predicted_rating_numerator += pearson_correlation * (int(float(dict_of_movies_user_in_database_has_rated[movie[0]])) - avg_rating)
 
         # compute predicted rating
-        predicted_rating = user_avg_rating + (predicted_rating_numerator / sum_of_pearson_correlation)
+        try:
+            predicted_rating = user_avg_rating + (predicted_rating_numerator / sum_of_pearson_correlation)
+        except ArithmeticError:
+            predicted_rating = user_avg_rating
+
         # print for testing purposes
         print("The predicted rating for movie", movie[0], "is", predicted_rating)
+
+        # add movie to heap of movies (It is a min heap, so subtract rating from 5 to make it a max heap)
+        heapq.heappush(movies_to_recommend, (5 - predicted_rating, movie))
 
         # if either 20 movies were considered for review or the program is taking longer than 10 seconds, quit
         count += 1
         if(count == 20 or (time.time() - start_time > 20)):
             break
 
+    # print total time algorithm took
+    print("*********************************************************")
+    print("The algorithm took %s seconds" % (time.time() - start_time))
+    print("The algorithm considered ", count, "movies for recommendation")
+    print("*********************************************************")
+
+    # return list of recommended movies as JSON
+    data_to_return = []
+    for x in range(5):
+        top_value_of_heap = heapq.heappop(movies_to_recommend)
+        top_movie = top_value_of_heap[1]
+        top_rating = 5 - top_value_of_heap[0]
+        cur.execute("""SELECT title FROM movies WHERE movieId=?""", top_movie)
+        movie_title = cur.fetchall()[0][0]
+        # print for testing purposes
+        print(x + 1, "The algorithm recommends movie", movie_title, "with predicted rating", top_rating)
+        data_to_return.append(movie_title)
+
     # close database connection 
     conn.close()
 
-    # print total time algorithm took
-    print("The algorithm took %s seconds" % (time.time() - start_time))
-    print("The algorithm considered ", count, "movies for recommendation")
-
-    # return list of recommended movies as JSON
-    return HttpResponse(json.dumps(user_data))
+    # return top five movies to recommend in order
+    return HttpResponse(json.dumps(data_to_return))
