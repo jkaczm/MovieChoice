@@ -35,9 +35,9 @@ def testJsonRequest(request):
 
 def getRecommendations(request):
     # print for testing purposes
-    print("*********************************************************")
+    print("*************************************************************************************")
     print("The algorithm begins execution")
-    print("*********************************************************")
+    print("*************************************************************************************")
 
     # get starting time of function
     start_time = time.time()
@@ -156,10 +156,10 @@ def getRecommendations(request):
             break
 
     # print total time algorithm took
-    print("*********************************************************")
+    print("**********************************************************************************")
     print("The algorithm took %s seconds" % (time.time() - start_time))
     print("The algorithm considered ", count, "movies for recommendation")
-    print("*********************************************************")
+    print("**********************************************************************************")
 
     # return list of recommended movies as JSON
     data_to_return = []
@@ -175,6 +175,11 @@ def getRecommendations(request):
 
     # close database connection 
     conn.close()
+
+    # print for testing purposes
+    print("**********************************************************************************")
+    print("The algorithm finished executing")
+    print("**********************************************************************************")
 
     # return top five movies to recommend in order
     return HttpResponse(json.dumps(data_to_return))

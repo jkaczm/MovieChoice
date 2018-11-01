@@ -1,0 +1,14 @@
+.jumbotron {
+    margin-bottom: 0%;
+    background-color: #E3F2FD;
+}
+
+.navbar-nav {
+    width: 100%;
+    text-align: center;
+}
+
+nav ul li {
+    float: none;
+    display: inline-block;
+}
