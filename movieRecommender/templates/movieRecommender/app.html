@@ -11,9 +11,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>Movie Choice</title>
-    <link rel="stylesheet" type="text/css" href="{% static 'style.css' %}"/>
-    <link rel="stylesheet" type="text/css" href="{% static '/css/bootstrap.min.css' %}"/>
-    <link rel="stylesheet" type="text/css" href="{% static '/css/style.css' %}"/>
+    <link rel="stylesheet" type="text/css" href="{% static '/css/bootstrap.min.css' %}" />
+    <link rel="stylesheet" type="text/css" href="{% static '/css/style.css' %}" />
 
     <script src="{% static '/js/bootstrap.min.js' %}"></script>
     <script src="{% static '/js/jquery-1.10.2.js' %}"></script>
@@ -22,7 +21,8 @@
 <body>
     <div class="jumbotron jumbotron-fluid">
         <div class="container">
-            <h1 class="display-4" style="text-align: center">Movie Choice</h1>
+            <h1 class="display-4">Movie Choice</h1>
+            <p>Utilizing machine learning to recommend you the best movie to watch</p>
         </div>
     </div>
 
@@ -46,20 +46,129 @@
         </ul>
     </nav>
 
-    <div class="container" style="padding-left:10%">
-       
+    <div class="container" style="text-align: center">
+
         <h1>Test Page</h1>
         <button id="btn">Click Me</button>
         <button id="btn2">Button To test Json</button>
         <button id="btn-for-ids">Get Movie Ids</button>
         <button id="get-recommendations">Get Recommendations</button>
+        <br>
+        <button id="btn-refresh" type="button" class="btn btn-primary">Refresh List of Movies</button>
+        <br>
+        <div class="container">
+            <div class="row">
+                <div id="11" style="background-color: coral; border:2px solid black; margin:1%; padding: 2%" class="col">
+                    One of three columns
+                </div>
+                <div id="12" style="background-color: coral; border:2px solid black; margin:1%; padding: 2%" class="col">
+                    One of three columns
+                </div>
+                <div id="13" style="background-color: coral; border:2px solid black; margin:1%; padding: 2%" class="col">
+                    One of three columns
+                </div>
+            </div>
+            <div class="row">
+                <div id="21" style="background-color: coral; border:2px solid black; margin:1%; padding: 2%" class="col">
+                    One of three columns
+                </div>
+                <div id="22" style="background-color: coral; border:2px solid black; margin:1%; padding: 2%" class="col">
+                    One of three columns
+                </div>
+                <div id="23" style="background-color: coral; border:2px solid black; margin:1%; padding: 2%" class="col">
+                    One of three columns
+                </div>
+            </div>
+            <div class="row">
+                <div id="31" style="background-color: coral; border:2px solid black; margin:1%; padding: 2%" class="col">
+                    One of three columns
+                </div>
+                <div id="32" style="background-color: coral; border:2px solid black; margin:1%; padding: 2%" class="col">
+                    One of three columns
+                </div>
+                <div id="33" style="background-color: coral; border:2px solid black; margin:1%; padding: 2%" class="col">
+                    One of three columns
+                </div>
+            </div>
+        </div>
+
+
         <div id="output"></div>
-   
-         
     </div>
 
     <script>
         var testVariable = " hello, I'm a test";
+
+        $("#11").mouseenter(function () {
+            $("#11").css("background-color", "red");
+        });
+        $("#11").mouseleave(function () {
+            $("#11").css("background-color", "coral");
+        });
+        $("#12").mouseenter(function () {
+            $("#12").css("background-color", "red");
+        });
+        $("#12").mouseleave(function () {
+            $("#12").css("background-color", "coral");
+        });
+        $("#13").mouseenter(function () {
+            $("#13").css("background-color", "red");
+        });
+        $("#13").mouseleave(function () {
+            $("#13").css("background-color", "coral");
+        });
+        $("#21").mouseenter(function () {
+            $("#21").css("background-color", "red");
+        });
+        $("#21").mouseleave(function () {
+            $("#21").css("background-color", "coral");
+        });
+        $("#22").mouseenter(function () {
+            $("#22").css("background-color", "red");
+        });
+        $("#22").mouseleave(function () {
+            $("#22").css("background-color", "coral");
+        });
+        $("#23").mouseenter(function () {
+            $("#23").css("background-color", "red");
+        });
+        $("#23").mouseleave(function () {
+            $("#23").css("background-color", "coral");
+        });
+        $("#31").mouseenter(function () {
+            $("#31").css("background-color", "red");
+        });
+        $("#31").mouseleave(function () {
+            $("#31").css("background-color", "coral");
+        });
+        $("#32").mouseenter(function () {
+            $("#32").css("background-color", "red");
+        });
+        $("#32").mouseleave(function () {
+            $("#32").css("background-color", "coral");
+        });
+        $("#33").mouseenter(function () {
+            $("#33").css("background-color", "red");
+        });
+        $("#33").mouseleave(function () {
+            $("#33").css("background-color", "coral");
+        });
+
+        $("#btn-refresh").click(function () {
+            $.get("/movieRecommender/getMovieIds")
+                .done(function (data) {
+                    movieIds = JSON.parse(data);
+                    $("#11").html(movieIds[0][1]);
+                    $("#12").html(movieIds[1][1]);
+                    $("#13").html(movieIds[2][1]);
+                    $("#21").html(movieIds[3][1]);
+                    $("#22").html(movieIds[4][1]);
+                    $("#23").html(movieIds[5][1]);
+                    $("#31").html(movieIds[6][1]);
+                    $("#32").html(movieIds[7][1]);
+                    $("#33").html(movieIds[8][1]);
+                });
+        });
 
         $("#btn").click(function () {
             $("#output").html("Button Was Clicked!");
@@ -74,13 +183,21 @@
 
         $("#btn2").click(function () {
             $("#output").html("Button to test JSON Was Clicked!");
-            var x = { movies : [] };
-            x["movies"][0] = { movieId : 1, rating : 4};
-            x["movies"][1] = { movieId : 2, rating : 2.5};
+            var x = {
+                movies: []
+            };
+            x["movies"][0] = {
+                movieId: 1,
+                rating: 4
+            };
+            x["movies"][1] = {
+                movieId: 2,
+                rating: 2.5
+            };
             console.log(JSON.stringify(x));
 
-            $.get("/movieRecommender/testJson", { 
-                JSON : JSON.stringify(x),
+            $.get("/movieRecommender/testJson", {
+                    JSON: JSON.stringify(x),
                 })
                 .done(function (data) {
                     parsedData = JSON.parse(data);
@@ -92,25 +209,37 @@
             $.get("/movieRecommender/getMovieIds")
                 .done(function (data) {
                     movieIds = JSON.parse(data);
+                    
                     $("#output").html(data);
+
+
+                    $("#11").html(movieIds[0][1]);
+                    $("#12").html(movieIds[1][1]);
+                    $("#13").html(movieIds[2][1]);
+                    $("#21").html(movieIds[3][1]);
+                    $("#22").html(movieIds[4][1]);
+                    $("#23").html(movieIds[5][1]);
+                    $("#31").html(movieIds[6][1]);
+                    $("#32").html(movieIds[7][1]);
+                    $("#33").html(movieIds[8][1]);
                 });
         });
 
         $("#get-recommendations").click(function () {
             var userData = [];
-            userData[0] = [1,2];
-            userData[1] = [2,3];
-            userData[2] = [3,2];
-            userData[3] = [4,4.5];
-            userData[4] = [5,2];
-            userData[5] = [6,3];
-            userData[6] = [7,2];
-            userData[7] = [8,4.5];
-            userData[8] = [9,3];
-            userData[9] = [10,2];
+            userData[0] = [1, 2];
+            userData[1] = [2, 3];
+            userData[2] = [3, 2];
+            userData[3] = [4, 4.5];
+            userData[4] = [5, 2];
+            userData[5] = [6, 3];
+            userData[6] = [7, 2];
+            userData[7] = [8, 4.5];
+            userData[8] = [9, 3];
+            userData[9] = [10, 2];
 
-            $.get("/movieRecommender/getRecommendations", { 
-                JSON : JSON.stringify(userData),
+            $.get("/movieRecommender/getRecommendations", {
+                    JSON: JSON.stringify(userData),
                 })
                 .done(function (data) {
                     recommendations = JSON.parse(data);
