@@ -13,151 +13,374 @@
     <title>Movie Choice</title>
     <link rel="stylesheet" type="text/css" href="{% static '/css/bootstrap.min.css' %}" />
     <link rel="stylesheet" type="text/css" href="{% static '/css/style.css' %}" />
-
+    <style>
+        *{
+            margin: 0;
+            padding: 0;
+        }
+        .rate {
+            float: left;
+            height: 46px;
+            padding: 0 10px;
+        }
+        .rate:not(:checked) > input {
+            position:absolute;
+            top:-9999px;
+        }
+        .rate:not(:checked) > label {
+            float:right;
+            width:1em;
+            overflow:hidden;
+            white-space:nowrap;
+            cursor:pointer;
+            font-size:30px;
+            color:#ccc;
+        }
+        .rate:not(:checked) > label:before {
+            content: '★ ';
+        }
+        .rate > input:checked ~ label {
+            color: #ffc700;    
+        }
+        .rate:not(:checked) > label:hover,
+        .rate:not(:checked) > label:hover ~ label {
+            color: #deb217;  
+        }
+        .rate > input:checked + label:hover,
+        .rate > input:checked + label:hover ~ label,
+        .rate > input:checked ~ label:hover,
+        .rate > input:checked ~ label:hover ~ label,
+        .rate > label:hover ~ input:checked ~ label {
+            color: #c59b08;
+        }
+    </style>
     <script src="{% static '/js/bootstrap.min.js' %}"></script>
     <script src="{% static '/js/jquery-1.10.2.js' %}"></script>
 </head>
 
-<body>
-    <div class="jumbotron jumbotron-fluid">
+<body style="background-color:#E1E2E1">
+    <div class="jumbotron jumbotron-fluid" style="background-color:#d50000">
         <div class="container">
-            <h1 class="display-4">Movie Choice</h1>
-            <p>Utilizing machine learning to recommend you the best movie to watch</p>
+            <h1 class="display-1" style="color: #ffffff">Movie Choice</h1>
+            <p style="color: #ffffff">Utilizing machine learning to recommend you the best movie to watch</p>
         </div>
     </div>
 
-    <nav class="navbar navbar-light justify-content-center" style="background-color:#E3F2FD">
+    <nav class="navbar navbar-light justify-content-center" style="background-color:#d50000">
         <ul class="nav">
             <li class="nav-item">
-                <a class="nav-link" href="#">Home</a>
+                <a class="nav-link" href="#" style="color: #ffffff"></a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" href="./pages/syllabus.html">Syllabus</a>
+                <a class="nav-link" href="./pages/syllabus.html" style="color: #ffffff"></a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" href="./pages/assignments.html">Assignments</a>
+                <a class="nav-link" href="./pages/assignments.html" style="color: #ffffff"></a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" href="./pages/notes.html">Notes</a>
+                <a class="nav-link" href="./pages/notes.html" style="color: #ffffff"></a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" href="#">Other Stuff</a>
+                <a class="nav-link" href="#" style="color: #ffffff"></a>
             </li>
         </ul>
     </nav>
 
-    <div class="container" style="text-align: center">
-
-        <h1>Test Page</h1>
-        <button id="btn">Click Me</button>
-        <button id="btn2">Button To test Json</button>
-        <button id="btn-for-ids">Get Movie Ids</button>
-        <button id="get-recommendations">Get Recommendations</button>
+    <div class="container" style="text-align: center; background-color:#E1E2E1">
         <br>
-        <button id="btn-refresh" type="button" class="btn btn-primary">Refresh List of Movies</button>
+        <button id="btn-refresh-movies" type="button" class="btn btn-primary">Refresh List of Movies</button>
         <br>
         <div class="container">
             <div class="row">
-                <div id="11" style="background-color: coral; border:2px solid black; margin:1%; padding: 2%" class="col">
-                    One of three columns
+                <div id="11" style="cursor: pointer; color:#ffffff; background-color: #d50000; border:2px solid black; margin:1%; padding: 2%"
+                    class="col">
+
                 </div>
-                <div id="12" style="background-color: coral; border:2px solid black; margin:1%; padding: 2%" class="col">
-                    One of three columns
+                <div id="12" style="cursor: pointer; color:#ffffff; background-color: #d50000; border:2px solid black; margin:1%; padding: 2%"
+                    class="col">
+
                 </div>
-                <div id="13" style="background-color: coral; border:2px solid black; margin:1%; padding: 2%" class="col">
-                    One of three columns
-                </div>
-            </div>
-            <div class="row">
-                <div id="21" style="background-color: coral; border:2px solid black; margin:1%; padding: 2%" class="col">
-                    One of three columns
-                </div>
-                <div id="22" style="background-color: coral; border:2px solid black; margin:1%; padding: 2%" class="col">
-                    One of three columns
-                </div>
-                <div id="23" style="background-color: coral; border:2px solid black; margin:1%; padding: 2%" class="col">
-                    One of three columns
+                <div id="13" style="cursor: pointer; color:#ffffff; background-color: #d50000; border:2px solid black; margin:1%; padding: 2%"
+                    class="col">
+
                 </div>
             </div>
             <div class="row">
-                <div id="31" style="background-color: coral; border:2px solid black; margin:1%; padding: 2%" class="col">
-                    One of three columns
+                <div id="21" style="cursor: pointer; color:#ffffff; background-color: #d50000; border:2px solid black; margin:1%; padding: 2%"
+                    class="col">
+
                 </div>
-                <div id="32" style="background-color: coral; border:2px solid black; margin:1%; padding: 2%" class="col">
-                    One of three columns
+                <div id="22" style="cursor: pointer; color:#ffffff; background-color: #d50000; border:2px solid black; margin:1%; padding: 2%"
+                    class="col">
+
                 </div>
-                <div id="33" style="background-color: coral; border:2px solid black; margin:1%; padding: 2%" class="col">
-                    One of three columns
+                <div id="23" style="cursor: pointer; color:#ffffff; background-color: #d50000; border:2px solid black; margin:1%; padding: 2%"
+                    class="col">
+
+                </div>
+            </div>
+            <div class="row">
+                <div id="31" style="cursor: pointer; color:#ffffff; background-color: #d50000; border:2px solid black; margin:1%; padding: 2%"
+                    class="col">
+
+                </div>
+                <div id="32" style="cursor: pointer; color:#ffffff; background-color: #d50000; border:2px solid black; margin:1%; padding: 2%"
+                    class="col">
+
+                </div>
+                <div id="33" style="cursor: pointer; color:#ffffff; background-color: #d50000; border:2px solid black; margin:1%; padding: 2%"
+                    class="col">
+
+                </div>
+            </div>
+            <div class="row">
+                <div class="rate">
+                    <input type="radio" id="star5" name="rate" value="5" />
+                    <label for="star5" title="text">5 stars</label>
+                    <input type="radio" id="star4" name="rate" value="4" />
+                    <label for="star4" title="text">4 stars</label>
+                    <input type="radio" id="star3" name="rate" value="3" />
+                    <label for="star3" title="text">3 stars</label>
+                    <input type="radio" id="star2" name="rate" value="2" />
+                    <label for="star2" title="text">2 stars</label>
+                    <input type="radio" id="star1" name="rate" value="1" />
+                    <label for="star1" title="text">1 star</label>
                 </div>
             </div>
         </div>
 
-
+        <br>
         <div id="output"></div>
+        <br>
+        <button id="btn-submit-rating" type="button" class="btn btn-primary">Submit Rating</button>
+        <br>
+        <button id="btn-get-rec" type="button" class="btn btn-primary">Get Recommendations</button>
+        <br>
+        <div id="movies_output"></div>
     </div>
 
     <script>
-        var testVariable = " hello, I'm a test";
+        var listOfMovies = [];
+        var ratedMovies = [];
+        var selectedMovie = [];
+        var selectedRating = 0;
+        var clicked_11 = false;
+        var clicked_12 = false;
+        var clicked_13 = false;
+        var clicked_21 = false;
+        var clicked_22 = false;
+        var clicked_23 = false;
+        var clicked_31 = false;
+        var clicked_32 = false;
+        var clicked_33 = false;
 
         $("#11").mouseenter(function () {
-            $("#11").css("background-color", "red");
+            $("#11").css("background-color", "#9b0000");
         });
         $("#11").mouseleave(function () {
-            $("#11").css("background-color", "coral");
+            if (!clicked_11) {
+                $("#11").css("background-color", "#d50000");
+            }
         });
         $("#12").mouseenter(function () {
-            $("#12").css("background-color", "red");
+            $("#12").css("background-color", "#9b0000");
         });
         $("#12").mouseleave(function () {
-            $("#12").css("background-color", "coral");
+            if (!clicked_12) {
+                $("#12").css("background-color", "#d50000");
+            }
         });
         $("#13").mouseenter(function () {
-            $("#13").css("background-color", "red");
+            $("#13").css("background-color", "#9b0000");
         });
         $("#13").mouseleave(function () {
-            $("#13").css("background-color", "coral");
+            $("#13").css("background-color", "#d50000");
         });
         $("#21").mouseenter(function () {
-            $("#21").css("background-color", "red");
+            $("#21").css("background-color", "#9b0000");
         });
         $("#21").mouseleave(function () {
-            $("#21").css("background-color", "coral");
+            $("#21").css("background-color", "#d50000");
         });
         $("#22").mouseenter(function () {
-            $("#22").css("background-color", "red");
+            $("#22").css("background-color", "#9b0000");
         });
         $("#22").mouseleave(function () {
-            $("#22").css("background-color", "coral");
+            $("#22").css("background-color", "#d50000");
         });
         $("#23").mouseenter(function () {
-            $("#23").css("background-color", "red");
+            $("#23").css("background-color", "#9b0000");
         });
         $("#23").mouseleave(function () {
-            $("#23").css("background-color", "coral");
+            $("#23").css("background-color", "#d50000");
         });
         $("#31").mouseenter(function () {
-            $("#31").css("background-color", "red");
+            $("#31").css("background-color", "#9b0000");
         });
         $("#31").mouseleave(function () {
-            $("#31").css("background-color", "coral");
+            $("#31").css("background-color", "#d50000");
         });
         $("#32").mouseenter(function () {
-            $("#32").css("background-color", "red");
+            $("#32").css("background-color", "#9b0000");
         });
         $("#32").mouseleave(function () {
-            $("#32").css("background-color", "coral");
+            $("#32").css("background-color", "#d50000");
         });
         $("#33").mouseenter(function () {
-            $("#33").css("background-color", "red");
+            $("#33").css("background-color", "#9b0000");
         });
         $("#33").mouseleave(function () {
-            $("#33").css("background-color", "coral");
+            $("#33").css("background-color", "#d50000");
         });
 
-        $("#btn-refresh").click(function () {
+        $("#11").click(function () {
+            selectedMovie = movieIds[0];
+            clicked_11 = true;
+            clicked_12 = false;
+            clicked_13 = false;
+            clicked_21 = false;
+            clicked_22 = false;
+            clicked_23 = false;
+            clicked_31 = false;
+            clicked_32 = false;
+            clicked_33 = false;
+            $("#11").css("background-color", "#9b0000");
+            $("#12").css("background-color", "#d50000");
+            $("#13").css("background-color", "#d50000");
+            $("#21").css("background-color", "#d50000");
+            $("#22").css("background-color", "#d50000");
+            $("#23").css("background-color", "#d50000");
+            $("#31").css("background-color", "#d50000");
+            $("#32").css("background-color", "#d50000");
+            $("#33").css("background-color", "#d50000");
+            $("#output").html("You have selected " + selectedMovie[1]);
+        });
+        $("#12").click(function () {
+            selectedMovie = movieIds[1];
+            clicked_11 = false;
+            clicked_12 = true;
+            clicked_13 = false;
+            clicked_21 = false;
+            clicked_22 = false;
+            clicked_23 = false;
+            clicked_31 = false;
+            clicked_32 = false;
+            clicked_33 = false;
+            $("#11").css("background-color", "#d50000");
+            $("#12").css("background-color", "#9b0000");
+            $("#13").css("background-color", "#d50000");
+            $("#21").css("background-color", "#d50000");
+            $("#22").css("background-color", "#d50000");
+            $("#23").css("background-color", "#d50000");
+            $("#31").css("background-color", "#d50000");
+            $("#32").css("background-color", "#d50000");
+            $("#33").css("background-color", "#d50000");
+            $("#output").html("You have selected " + selectedMovie[1]);
+        });
+        $("#13").click(function () {
+            selectedMovie = movieIds[2];
+            $("#output").html("You have selected " + selectedMovie[1]);
+        });
+        $("#21").click(function () {
+            selectedMovie = movieIds[3];
+            $("#output").html("You have selected " + selectedMovie[1]);
+        });
+        $("#22").click(function () {
+            selectedMovie = movieIds[4];
+            $("#output").html("You have selected " + selectedMovie[1]);
+        });
+        $("#23").click(function () {
+            selectedMovie = movieIds[5];
+            $("#output").html("You have selected " + selectedMovie[1]);
+        });
+        $("#31").click(function () {
+            selectedMovie = movieIds[6];
+            $("#output").html("You have selected " + selectedMovie[1]);
+        });
+        $("#32").click(function () {
+            selectedMovie = movieIds[7];
+            $("#output").html("You have selected " + selectedMovie[1]);
+        });
+        $("#33").click(function () {
+            selectedMovie = movieIds[8];
+            $("#output").html("You have selected " + selectedMovie[1]);
+        });
+
+        $("#star1").click(function () {
+            selectedRating = 1;
+            $("#output").html("You give " + selectedMovie[1] + " a rating of " + selectedRating);
+        });
+        $("#star2").click(function () {
+            selectedRating = 2;
+            $("#output").html("You give " + selectedMovie[1] + " a rating of " + selectedRating);
+        });
+        $("#star3").click(function () {
+            selectedRating = 3;
+            $("#output").html("You give " + selectedMovie[1] + " a rating of " + selectedRating);
+        });
+        $("#star4").click(function () {
+            selectedRating = 4;
+            $("#output").html("You give " + selectedMovie[1] + " a rating of " + selectedRating);
+        });
+        $("#star5").click(function () {
+            selectedRating = 5;
+            $("#output").html("You give " + selectedMovie[1] + " a rating of " + selectedRating);
+        });
+
+
+        $("#btn-submit-rating").click(function () {
+            ratedMovies.push([selectedMovie[0], selectedRating]);
+            $("#output").html("List of currently rated movies: " + ratedMovies);
+            clicked_11 = false;
+            clicked_12 = false;
+            clicked_13 = false;
+            clicked_21 = false;
+            clicked_22 = false;
+            clicked_23 = false;
+            clicked_31 = false;
+            clicked_32 = false;
+            clicked_33 = false;
+            $("#11").css("background-color", "#d50000");
+            $("#12").css("background-color", "#d50000");
+            $("#13").css("background-color", "#d50000");
+            $("#21").css("background-color", "#d50000");
+            $("#22").css("background-color", "#d50000");
+            $("#23").css("background-color", "#d50000");
+            $("#31").css("background-color", "#d50000");
+            $("#32").css("background-color", "#d50000");
+            $("#33").css("background-color", "#d50000");
             $.get("/movieRecommender/getMovieIds")
                 .done(function (data) {
                     movieIds = JSON.parse(data);
+                    listOfMovies = movieIds;
+                    $("#11").html(movieIds[0][1]);
+                    $("#12").html(movieIds[1][1]);
+                    $("#13").html(movieIds[2][1]);
+                    $("#21").html(movieIds[3][1]);
+                    $("#22").html(movieIds[4][1]);
+                    $("#23").html(movieIds[5][1]);
+                    $("#31").html(movieIds[6][1]);
+                    $("#32").html(movieIds[7][1]);
+                    $("#33").html(movieIds[8][1]);
+                });
+        });
+
+        $("#btn-get-rec").click(function () {
+            $("#output").html("<h1>Please Wait.  The computer is thinking...</h1>");
+            $.get("/movieRecommender/getRecommendations", {
+                    JSON: JSON.stringify(ratedMovies),
+                })
+                .done(function (data) {
+                    recommendations = JSON.parse(data);
+                    $("#movies_output").html(recommendations);
+                });
+        });
+
+        $("#btn-refresh-movies").click(function () {
+            $.get("/movieRecommender/getMovieIds")
+                .done(function (data) {
+                    movieIds = JSON.parse(data);
+                    listOfMovies = movieIds;
                     $("#11").html(movieIds[0][1]);
                     $("#12").html(movieIds[1][1]);
                     $("#13").html(movieIds[2][1]);
@@ -209,7 +432,7 @@
             $.get("/movieRecommender/getMovieIds")
                 .done(function (data) {
                     movieIds = JSON.parse(data);
-                    
+
                     $("#output").html(data);
 
 
