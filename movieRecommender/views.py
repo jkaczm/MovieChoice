@@ -171,7 +171,7 @@ def getRecommendations(request):
         movie_title = cur.fetchall()[0][0]
         # print for testing purposes
         print(x + 1, "The algorithm recommends movie", movie_title, "with predicted rating", top_rating)
-        data_to_return.append(movie_title)
+        data_to_return.append([movie_title, top_rating])
 
     # close database connection 
     conn.close()

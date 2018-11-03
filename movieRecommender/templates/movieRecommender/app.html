@@ -20,12 +20,12 @@
         }
         .rate {
             float: left;
-            height: 46px;
-            padding: 0 10px;
+            height:auto;
+            padding: 0;
         }
         .rate:not(:checked) > input {
             position:absolute;
-            top:-9999px;
+            visibility: hidden;
         }
         .rate:not(:checked) > label {
             float:right;
@@ -33,7 +33,7 @@
             overflow:hidden;
             white-space:nowrap;
             cursor:pointer;
-            font-size:30px;
+            font-size:100px;
             color:#ccc;
         }
         .rate:not(:checked) > label:before {
@@ -134,7 +134,7 @@
                 </div>
             </div>
             <div class="row">
-                <div class="rate">
+                <div class="col rate">
                     <input type="radio" id="star5" name="rate" value="5" />
                     <label for="star5" title="text">5 stars</label>
                     <input type="radio" id="star4" name="rate" value="4" />
@@ -146,17 +146,33 @@
                     <input type="radio" id="star1" name="rate" value="1" />
                     <label for="star1" title="text">1 star</label>
                 </div>
+                <div class="col" style="text-align:left; margin-top: 65px">
+                    <button id="btn-submit-rating" type="button" class="btn btn-primary">Submit
+                        Rating</button>
+                </div>
             </div>
         </div>
-
-        <br>
         <div id="output"></div>
-        <br>
-        <button id="btn-submit-rating" type="button" class="btn btn-primary">Submit Rating</button>
         <br>
         <button id="btn-get-rec" type="button" class="btn btn-primary">Get Recommendations</button>
         <br>
+        <br>
         <div id="movies_output"></div>
+        <br>
+        <br>
+        <br>
+        <br>
+        <br>
+        <br>
+        <br>
+        <br>
+        <br>
+        <br>
+        <br>
+        <br>
+        <br>
+        <br>
+        <br>
     </div>
 
     <script>
@@ -173,6 +189,9 @@
         var clicked_31 = false;
         var clicked_32 = false;
         var clicked_33 = false;
+
+        var i = 0;
+        var html_formatted = "";
 
         $("#11").mouseenter(function () {
             $("#11").css("background-color", "#9b0000");
@@ -329,26 +348,145 @@
 
 
         $("#btn-submit-rating").click(function () {
-            ratedMovies.push([selectedMovie[0], selectedRating]);
-            $("#output").html("List of currently rated movies: " + ratedMovies);
-            clicked_11 = false;
-            clicked_12 = false;
-            clicked_13 = false;
-            clicked_21 = false;
-            clicked_22 = false;
-            clicked_23 = false;
-            clicked_31 = false;
-            clicked_32 = false;
-            clicked_33 = false;
-            $("#11").css("background-color", "#d50000");
-            $("#12").css("background-color", "#d50000");
-            $("#13").css("background-color", "#d50000");
-            $("#21").css("background-color", "#d50000");
-            $("#22").css("background-color", "#d50000");
-            $("#23").css("background-color", "#d50000");
-            $("#31").css("background-color", "#d50000");
-            $("#32").css("background-color", "#d50000");
-            $("#33").css("background-color", "#d50000");
+            if (selectedRating != 0) {
+                ratedMovies.push([selectedMovie[0], selectedRating, selectedMovie[1]]);
+
+
+                for (i = 0; i < ratedMovies.length; i++) { 
+                    html_formatted += "\
+                        <tr>\
+                            <td>" +
+                            ratedMovies[i][2] + "</td>\
+                            <td>" +
+                            ratedMovies[i][1]+
+                            "</td>\
+                        </tr>";
+                }
+                $("#output").html(
+                    "\
+                    <h1>Your selections:</h1>\
+                    <table class=\"table\">\
+                        <tr>\
+                            <th>Movie Title</th>\
+                            <th>Rating</th>\
+                        </tr>\
+                         " + html_formatted + " \
+                    </table>\
+                    "
+                );
+                html_formatted = "";
+
+                selectedRating = 0;
+                clicked_11 = false;
+                clicked_12 = false;
+                clicked_13 = false;
+                clicked_21 = false;
+                clicked_22 = false;
+                clicked_23 = false;
+                clicked_31 = false;
+                clicked_32 = false;
+                clicked_33 = false;
+                $("#11").css("background-color", "#d50000");
+                $("#12").css("background-color", "#d50000");
+                $("#13").css("background-color", "#d50000");
+                $("#21").css("background-color", "#d50000");
+                $("#22").css("background-color", "#d50000");
+                $("#23").css("background-color", "#d50000");
+                $("#31").css("background-color", "#d50000");
+                $("#32").css("background-color", "#d50000");
+                $("#33").css("background-color", "#d50000");
+                $("#star1").removeAttr('checked');
+                $("#star2").removeAttr('checked');
+                $("#star3").removeAttr('checked');
+                $("#star4").removeAttr('checked');
+                $("#star5").removeAttr('checked');
+                $("#star1").removeAttr('hover');
+                $("#star2").removeAttr('hover');
+                $("#star3").removeAttr('hover');
+                $("#star4").removeAttr('hover');
+                $("#star5").removeAttr('hover');
+                $.get("/movieRecommender/getMovieIds")
+                    .done(function (data) {
+                        movieIds = JSON.parse(data);
+                        listOfMovies = movieIds;
+                        $("#11").html(movieIds[0][1]);
+                        $("#12").html(movieIds[1][1]);
+                        $("#13").html(movieIds[2][1]);
+                        $("#21").html(movieIds[3][1]);
+                        $("#22").html(movieIds[4][1]);
+                        $("#23").html(movieIds[5][1]);
+                        $("#31").html(movieIds[6][1]);
+                        $("#32").html(movieIds[7][1]);
+                        $("#33").html(movieIds[8][1]);
+                    });
+            } else {
+                $("#output").html("<h1>Please select a rating</h1>");
+            }
+        });
+
+        $("#btn-get-rec").click(function () {
+            var min = 8;
+            if (ratedMovies.length >= min) {
+                $("#output").html("<h1>Please Wait.  The computer is thinking...</h1>");
+                $.get("/movieRecommender/getRecommendations", {
+                        JSON: JSON.stringify(ratedMovies),
+                    })
+                    .done(function (data) {
+                        recommendations = JSON.parse(data);
+                        $("#output").html("");
+                        $("#movies_output").html(
+                            "\
+                    <h1>Recommended Movies:</h1>\
+                    <table class=\"table\">\
+                        <tr>\
+                            <th>Movie Title</th>\
+                            <th>Predicted Rating</th>\
+                        </tr>\
+                        <tr>\
+                            <td>" +
+                            recommendations[0][0] + "</td>\
+                            <td>" +
+                            recommendations[0][1].toFixed(2) +
+                            "</td>\
+                        </tr>\
+                        <tr>\
+                            <td>" +
+                            recommendations[1][0] + "</td>\
+                            <td>" +
+                            recommendations[1][1].toFixed(2) +
+                            "</td>\
+                        </tr>\
+                        <tr>\
+                            <td>" +
+                            recommendations[2][0] + "</td>\
+                            <td>" +
+                            recommendations[2][1].toFixed(2) +
+                            "</td>\
+                        </tr>\
+                        <tr>\
+                            <td>" +
+                            recommendations[3][0] + "</td>\
+                            <td>" +
+                            recommendations[3][1].toFixed(2) +
+                            "</td>\
+                        </tr>\
+                        <tr>\
+                            <td>" +
+                            recommendations[4][0] + "</td>\
+                            <td>" +
+                            recommendations[4][1].toFixed(2) +
+                            "</td>\
+                        </tr>\
+                    </table>\
+                    "
+                        );
+                    });
+            } else {
+                $("#output").html("<h1>Please rate " + (min - ratedMovies.length) + " more movies</h1>");
+            }
+        });
+
+        $("#btn-refresh-movies").click(function () {
             $.get("/movieRecommender/getMovieIds")
                 .done(function (data) {
                     movieIds = JSON.parse(data);
@@ -365,18 +503,7 @@
                 });
         });
 
-        $("#btn-get-rec").click(function () {
-            $("#output").html("<h1>Please Wait.  The computer is thinking...</h1>");
-            $.get("/movieRecommender/getRecommendations", {
-                    JSON: JSON.stringify(ratedMovies),
-                })
-                .done(function (data) {
-                    recommendations = JSON.parse(data);
-                    $("#movies_output").html(recommendations);
-                });
-        });
-
-        $("#btn-refresh-movies").click(function () {
+        $(document).ready(function () {
             $.get("/movieRecommender/getMovieIds")
                 .done(function (data) {
                     movieIds = JSON.parse(data);
