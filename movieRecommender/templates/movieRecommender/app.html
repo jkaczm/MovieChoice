@@ -62,7 +62,7 @@
     <div class="jumbotron jumbotron-fluid" style="background-color:#d50000">
         <div class="container">
             <h1 class="display-1" style="color: #ffffff">Movie Choice</h1>
-            <p style="color: #ffffff">Utilizing machine learning to recommend you the best movie to watch</p>
+            <p style="color: #ffffff">Utilizing machine learning to recommend the best movies for you to watch</p>
         </div>
     </div>
 
@@ -213,47 +213,60 @@
             $("#13").css("background-color", "#9b0000");
         });
         $("#13").mouseleave(function () {
-            $("#13").css("background-color", "#d50000");
+            if (!clicked_13) {
+                $("#13").css("background-color", "#d50000");
+            }
         });
         $("#21").mouseenter(function () {
             $("#21").css("background-color", "#9b0000");
         });
         $("#21").mouseleave(function () {
-            $("#21").css("background-color", "#d50000");
+            if (!clicked_21) {
+                $("#21").css("background-color", "#d50000");
+            }
         });
         $("#22").mouseenter(function () {
             $("#22").css("background-color", "#9b0000");
         });
         $("#22").mouseleave(function () {
-            $("#22").css("background-color", "#d50000");
+            if (!clicked_22) {
+                $("#22").css("background-color", "#d50000");
+            }
         });
         $("#23").mouseenter(function () {
             $("#23").css("background-color", "#9b0000");
         });
         $("#23").mouseleave(function () {
-            $("#23").css("background-color", "#d50000");
+            if (!clicked_23) {
+                $("#23").css("background-color", "#d50000");
+            }
         });
         $("#31").mouseenter(function () {
             $("#31").css("background-color", "#9b0000");
         });
         $("#31").mouseleave(function () {
-            $("#31").css("background-color", "#d50000");
+            if (!clicked_31) {
+                $("#31").css("background-color", "#d50000");
+            }
         });
         $("#32").mouseenter(function () {
             $("#32").css("background-color", "#9b0000");
         });
         $("#32").mouseleave(function () {
-            $("#32").css("background-color", "#d50000");
+            if (!clicked_32) {
+                $("#32").css("background-color", "#d50000");
+            }
         });
         $("#33").mouseenter(function () {
             $("#33").css("background-color", "#9b0000");
         });
         $("#33").mouseleave(function () {
-            $("#33").css("background-color", "#d50000");
+            if (!clicked_33) {
+                $("#33").css("background-color", "#d50000");
+            }
         });
 
         $("#11").click(function () {
-            selectedMovie = movieIds[0];
             clicked_11 = true;
             clicked_12 = false;
             clicked_13 = false;
@@ -272,10 +285,15 @@
             $("#31").css("background-color", "#d50000");
             $("#32").css("background-color", "#d50000");
             $("#33").css("background-color", "#d50000");
-            $("#output").html("You have selected " + selectedMovie[1]);
+            $("#star1").removeAttr('checked');
+            $("#star2").removeAttr('checked');
+            $("#star3").removeAttr('checked');
+            $("#star4").removeAttr('checked');
+            $("#star5").removeAttr('checked');
+            selectedMovie = movieIds[0];
+            $("#output").html("<h1>You have selected " + selectedMovie[1] + "</h1>");
         });
         $("#12").click(function () {
-            selectedMovie = movieIds[1];
             clicked_11 = false;
             clicked_12 = true;
             clicked_13 = false;
@@ -294,56 +312,248 @@
             $("#31").css("background-color", "#d50000");
             $("#32").css("background-color", "#d50000");
             $("#33").css("background-color", "#d50000");
-            $("#output").html("You have selected " + selectedMovie[1]);
+            $("#star1").removeAttr('checked');
+            $("#star2").removeAttr('checked');
+            $("#star3").removeAttr('checked');
+            $("#star4").removeAttr('checked');
+            $("#star5").removeAttr('checked');
+            selectedMovie = movieIds[1];
+            $("#output").html("<h1>You have selected " + selectedMovie[1] + "</h1>");
         });
         $("#13").click(function () {
+            clicked_11 = false;
+            clicked_12 = false;
+            clicked_13 = true;
+            clicked_21 = false;
+            clicked_22 = false;
+            clicked_23 = false;
+            clicked_31 = false;
+            clicked_32 = false;
+            clicked_33 = false;
+            $("#11").css("background-color", "#d50000");
+            $("#12").css("background-color", "#d50000");
+            $("#13").css("background-color", "#9b0000");
+            $("#21").css("background-color", "#d50000");
+            $("#22").css("background-color", "#d50000");
+            $("#23").css("background-color", "#d50000");
+            $("#31").css("background-color", "#d50000");
+            $("#32").css("background-color", "#d50000");
+            $("#33").css("background-color", "#d50000");
+            $("#star1").removeAttr('checked');
+            $("#star2").removeAttr('checked');
+            $("#star3").removeAttr('checked');
+            $("#star4").removeAttr('checked');
+            $("#star5").removeAttr('checked');
             selectedMovie = movieIds[2];
-            $("#output").html("You have selected " + selectedMovie[1]);
+            $("#output").html("<h1>You have selected " + selectedMovie[1] + "</h1>");
         });
         $("#21").click(function () {
+            clicked_11 = false;
+            clicked_12 = false;
+            clicked_13 = false;
+            clicked_21 = true;
+            clicked_22 = false;
+            clicked_23 = false;
+            clicked_31 = false;
+            clicked_32 = false;
+            clicked_33 = false;
+            $("#11").css("background-color", "#d50000");
+            $("#12").css("background-color", "#d50000");
+            $("#13").css("background-color", "#d50000");
+            $("#21").css("background-color", "#9b0000");
+            $("#22").css("background-color", "#d50000");
+            $("#23").css("background-color", "#d50000");
+            $("#31").css("background-color", "#d50000");
+            $("#32").css("background-color", "#d50000");
+            $("#33").css("background-color", "#d50000");
+            $("#star1").removeAttr('checked');
+            $("#star2").removeAttr('checked');
+            $("#star3").removeAttr('checked');
+            $("#star4").removeAttr('checked');
+            $("#star5").removeAttr('checked');
             selectedMovie = movieIds[3];
-            $("#output").html("You have selected " + selectedMovie[1]);
+            $("#output").html("<h1>You have selected " + selectedMovie[1] + "</h1>");
         });
         $("#22").click(function () {
+            clicked_11 = false;
+            clicked_12 = false;
+            clicked_13 = false;
+            clicked_21 = false;
+            clicked_22 = true;
+            clicked_23 = false;
+            clicked_31 = false;
+            clicked_32 = false;
+            clicked_33 = false;
+            $("#11").css("background-color", "#d50000");
+            $("#12").css("background-color", "#d50000");
+            $("#13").css("background-color", "#d50000");
+            $("#21").css("background-color", "#d50000");
+            $("#22").css("background-color", "#9b0000");
+            $("#23").css("background-color", "#d50000");
+            $("#31").css("background-color", "#d50000");
+            $("#32").css("background-color", "#d50000");
+            $("#33").css("background-color", "#d50000");
+            $("#star1").removeAttr('checked');
+            $("#star2").removeAttr('checked');
+            $("#star3").removeAttr('checked');
+            $("#star4").removeAttr('checked');
+            $("#star5").removeAttr('checked');
             selectedMovie = movieIds[4];
-            $("#output").html("You have selected " + selectedMovie[1]);
+            $("#output").html("<h1>You have selected " + selectedMovie[1] + "</h1>");
         });
         $("#23").click(function () {
+            clicked_11 = false;
+            clicked_12 = false;
+            clicked_13 = false;
+            clicked_21 = false;
+            clicked_22 = false;
+            clicked_23 = true;
+            clicked_31 = false;
+            clicked_32 = false;
+            clicked_33 = false;
+            $("#11").css("background-color", "#d50000");
+            $("#12").css("background-color", "#d50000");
+            $("#13").css("background-color", "#d50000");
+            $("#21").css("background-color", "#d50000");
+            $("#22").css("background-color", "#d50000");
+            $("#23").css("background-color", "#9b0000");
+            $("#31").css("background-color", "#d50000");
+            $("#32").css("background-color", "#d50000");
+            $("#33").css("background-color", "#d50000");
+            $("#star1").removeAttr('checked');
+            $("#star2").removeAttr('checked');
+            $("#star3").removeAttr('checked');
+            $("#star4").removeAttr('checked');
+            $("#star5").removeAttr('checked');
             selectedMovie = movieIds[5];
-            $("#output").html("You have selected " + selectedMovie[1]);
+            $("#output").html("<h1>You have selected " + selectedMovie[1] + "</h1>");
         });
         $("#31").click(function () {
+            clicked_11 = false;
+            clicked_12 = false;
+            clicked_13 = false;
+            clicked_21 = false;
+            clicked_22 = false;
+            clicked_23 = false;
+            clicked_31 = true;
+            clicked_32 = false;
+            clicked_33 = false;
+            $("#11").css("background-color", "#d50000");
+            $("#12").css("background-color", "#d50000");
+            $("#13").css("background-color", "#d50000");
+            $("#21").css("background-color", "#d50000");
+            $("#22").css("background-color", "#d50000");
+            $("#23").css("background-color", "#d50000");
+            $("#31").css("background-color", "#9b0000");
+            $("#32").css("background-color", "#d50000");
+            $("#33").css("background-color", "#d50000");
+            $("#star1").removeAttr('checked');
+            $("#star2").removeAttr('checked');
+            $("#star3").removeAttr('checked');
+            $("#star4").removeAttr('checked');
+            $("#star5").removeAttr('checked');
             selectedMovie = movieIds[6];
-            $("#output").html("You have selected " + selectedMovie[1]);
+            $("#output").html("<h1>You have selected " + selectedMovie[1] + "</h1>");
         });
         $("#32").click(function () {
+            clicked_11 = false;
+            clicked_12 = false;
+            clicked_13 = false;
+            clicked_21 = false;
+            clicked_22 = false;
+            clicked_23 = false;
+            clicked_31 = false;
+            clicked_32 = true;
+            clicked_33 = false;
+            $("#11").css("background-color", "#d50000");
+            $("#12").css("background-color", "#d50000");
+            $("#13").css("background-color", "#d50000");
+            $("#21").css("background-color", "#d50000");
+            $("#22").css("background-color", "#d50000");
+            $("#23").css("background-color", "#d50000");
+            $("#31").css("background-color", "#d50000");
+            $("#32").css("background-color", "#9b0000");
+            $("#33").css("background-color", "#d50000");
+            $("#star1").removeAttr('checked');
+            $("#star2").removeAttr('checked');
+            $("#star3").removeAttr('checked');
+            $("#star4").removeAttr('checked');
+            $("#star5").removeAttr('checked');
             selectedMovie = movieIds[7];
-            $("#output").html("You have selected " + selectedMovie[1]);
+            $("#output").html("<h1>You have selected " + selectedMovie[1] + "</h1>");
         });
         $("#33").click(function () {
+            clicked_11 = false;
+            clicked_12 = false;
+            clicked_13 = false;
+            clicked_21 = false;
+            clicked_22 = false;
+            clicked_23 = false;
+            clicked_31 = false;
+            clicked_32 = false;
+            clicked_33 = true;
+            $("#11").css("background-color", "#d50000");
+            $("#12").css("background-color", "#d50000");
+            $("#13").css("background-color", "#d50000");
+            $("#21").css("background-color", "#d50000");
+            $("#22").css("background-color", "#d50000");
+            $("#23").css("background-color", "#d50000");
+            $("#31").css("background-color", "#d50000");
+            $("#32").css("background-color", "#d50000");
+            $("#33").css("background-color", "#9b0000");
+            $("#star1").removeAttr('checked');
+            $("#star2").removeAttr('checked');
+            $("#star3").removeAttr('checked');
+            $("#star4").removeAttr('checked');
+            $("#star5").removeAttr('checked');
             selectedMovie = movieIds[8];
-            $("#output").html("You have selected " + selectedMovie[1]);
+            $("#output").html("<h1>You have selected " + selectedMovie[1] + "</h1>");
         });
 
         $("#star1").click(function () {
-            selectedRating = 1;
-            $("#output").html("You give " + selectedMovie[1] + " a rating of " + selectedRating);
+            if (selectedMovie.length != 0) {
+                selectedRating = 1;
+                $("#output").html("<h1>You give " + selectedMovie[1] + " a rating of " + selectedRating +
+                    "</h1>");
+            } else {
+                $("#output").html("<h1>Please select a movie to rate</h1>");
+            }
         });
         $("#star2").click(function () {
-            selectedRating = 2;
-            $("#output").html("You give " + selectedMovie[1] + " a rating of " + selectedRating);
+            if (selectedMovie.length != 0) {
+                selectedRating = 2;
+                $("#output").html("<h1>You give " + selectedMovie[1] + " a rating of " + selectedRating +
+                    "</h1>");
+            } else {
+                $("#output").html("<h1>Please select a movie to rate</h1>");
+            }
         });
         $("#star3").click(function () {
-            selectedRating = 3;
-            $("#output").html("You give " + selectedMovie[1] + " a rating of " + selectedRating);
+            if (selectedMovie.length != 0) {
+                selectedRating = 3;
+                $("#output").html("<h1>You give " + selectedMovie[1] + " a rating of " + selectedRating +
+                    "</h1>");
+            } else {
+                $("#output").html("<h1>Please select a movie to rate</h1>");
+            }
         });
         $("#star4").click(function () {
-            selectedRating = 4;
-            $("#output").html("You give " + selectedMovie[1] + " a rating of " + selectedRating);
+            if (selectedMovie.length != 0) {
+                selectedRating = 4;
+                $("#output").html("<h1>You give " + selectedMovie[1] + " a rating of " + selectedRating +
+                    "</h1>");
+            } else {
+                $("#output").html("<h1>Please select a movie to rate</h1>");
+            }
         });
         $("#star5").click(function () {
-            selectedRating = 5;
-            $("#output").html("You give " + selectedMovie[1] + " a rating of " + selectedRating);
+            if (selectedMovie.length != 0) {
+                selectedRating = 5;
+                $("#output").html("<h1>You give " + selectedMovie[1] + " a rating of " + selectedRating +
+                    "</h1>");
+            } else {
+                $("#output").html("<h1>Please select a movie to rate</h1>");
+            }
         });
 
 
@@ -351,15 +561,16 @@
             if (selectedRating != 0) {
                 ratedMovies.push([selectedMovie[0], selectedRating, selectedMovie[1]]);
 
+                selectedMovie = [];
 
-                for (i = 0; i < ratedMovies.length; i++) { 
+                for (i = 0; i < ratedMovies.length; i++) {
                     html_formatted += "\
                         <tr>\
                             <td>" +
-                            ratedMovies[i][2] + "</td>\
+                        ratedMovies[i][2] + "</td>\
                             <td>" +
-                            ratedMovies[i][1]+
-                            "</td>\
+                        ratedMovies[i][1] +
+                        "</td>\
                         </tr>";
                 }
                 $("#output").html(
@@ -370,7 +581,8 @@
                             <th>Movie Title</th>\
                             <th>Rating</th>\
                         </tr>\
-                         " + html_formatted + " \
+                         " +
+                    html_formatted + " \
                     </table>\
                     "
                 );
