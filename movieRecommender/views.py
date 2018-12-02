@@ -13,6 +13,9 @@ def app(request):
     #return HttpResponse(str(cur.fetchone()))
     return render(request,'movieRecommender/app.html')
 
+def about(request):
+    return render(request,'movieRecommender/about.html')
+
 def getMovieIds(request):
     conn = sqlite3.connect('movieRecommender.db')
     cur = conn.cursor()
@@ -152,7 +155,7 @@ def getRecommendations(request):
 
         # if either 20 movies were considered for review or the program is taking longer than 10 seconds, quit
         count += 1
-        if(count == 20 or (time.time() - start_time > 20)):
+        if(count == 40 or (time.time() - start_time > 20)):
             break
 
     # print total time algorithm took

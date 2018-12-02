@@ -7,4 +7,5 @@ urlpatterns = [
     path('getMovieIds', views.getMovieIds),
     path('testJson', views.testJsonRequest),
     path('getRecommendations', views.getRecommendations),
+    path('about', views.about, name='about'),
 ]
