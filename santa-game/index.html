@@ -37,13 +37,19 @@
   .overlay {
     position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
     background: radial-gradient(ellipse at center, rgba(10,14,30,0.55), rgba(0,0,0,0.85));
-    backdrop-filter: blur(3px); z-index: 10; padding: 16px;
+    backdrop-filter: blur(3px); z-index: 10;
+    padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
   }
   .hidden { display: none !important; }
   .card {
-    max-width: 640px; width: 100%; max-height: calc(100vh - 32px); overflow-y: auto; background: rgba(28,12,10,0.88); border: 2px solid var(--gold);
+    max-width: 640px; width: 100%; max-height: 100%; background: rgba(28,12,10,0.88); border: 2px solid var(--gold);
     border-radius: 14px; padding: 28px 32px; box-shadow: 0 0 60px rgba(242,193,78,0.25); text-align: center;
+    display: flex; flex-direction: column; overflow: hidden;
   }
+  /* the text scrolls if space is tight; the button underneath is always visible */
+  .card-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
+  .card-foot { flex: none; }
+  .card-foot button { margin-top: 10px; }
   h1 { margin: 0 0 6px; font-size: 44px; color: var(--gold); letter-spacing: 1px; text-shadow: 0 2px 0 #7a1010; }
   h2 { margin: 0 0 10px; color: var(--gold); }
   .sub { font-style: italic; opacity: 0.85; margin-bottom: 16px; }
@@ -80,7 +86,7 @@
   #vignette { position: fixed; inset: 0; pointer-events: none; z-index: 4; background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.6)); }
 
   .polaroid { background: #fbf8f0; padding: 14px 14px 18px; display: inline-block; transform: rotate(-2.5deg); box-shadow: 0 10px 30px rgba(0,0,0,0.6); margin: 10px 0 6px; max-width: 100%; }
-  .polaroid img { display: block; width: 100%; max-width: min(480px, 56vh); aspect-ratio: 4/3; object-fit: cover; filter: sepia(0.15) contrast(1.05); }
+  .polaroid img { display: block; width: 100%; max-width: min(480px, 50vh); aspect-ratio: 4/3; object-fit: cover; filter: sepia(0.15) contrast(1.05); }
   .polaroid .cap { color: #333; font: italic 20px "Comic Sans MS", "Bradley Hand", cursive; margin-top: 10px; }
   .stars { font-size: 34px; color: var(--gold); letter-spacing: 6px; }
 
@@ -101,6 +107,12 @@
     .stars { font-size: 26px; }
   }
   @media (orientation: landscape) { #rotateTip { display: none !important; } }
+  @media (max-height: 400px) {
+    .card { padding: 10px 14px; }
+    h1 { font-size: 22px !important; }
+    .sub { display: none; }
+    .card-foot button { margin-top: 6px; padding: 8px 24px; font-size: 16px; }
+  }
   @media (max-height: 520px) {
     h1 { font-size: 26px; margin: 0; }
     .sub { margin-bottom: 6px; font-size: 13px; }
@@ -146,6 +158,7 @@
 
 <div id="intro" class="overlay">
   <div class="card">
+    <div class="card-body">
     <h1>🎅 Catch Santa! 🎄</h1>
     <div class="sub">Christmas morning, 3:07 a.m.</div>
     <div class="story">
@@ -173,22 +186,25 @@
       <b>Click / Space</b><span>Take a photo (3 shots of film)</span>
       <b>Esc</b><span>Pause</span>
     </div>
-    <button id="startBtn">Tiptoe downstairs</button>
     <div class="tip">Tip: when Santa turns around, freeze and crouch. Shots from close range score higher.</div>
+    </div>
+    <div class="card-foot"><button id="startBtn">Tiptoe downstairs</button></div>
   </div>
 </div>
 
 <div id="pause" class="overlay hidden">
-  <div class="card"><h2>Paused</h2><div>Shh… Santa hasn't noticed a thing.</div><button id="resumeBtn">Resume</button></div>
+  <div class="card"><div class="card-body"><h2>Paused</h2><div>Shh… Santa hasn't noticed a thing.</div></div><div class="card-foot"><button id="resumeBtn">Resume</button></div></div>
 </div>
 
 <div id="end" class="overlay hidden">
   <div class="card">
+    <div class="card-body">
     <h1 id="endTitle"></h1>
     <div id="endPhoto"></div>
     <div id="endStars" class="stars"></div>
     <div id="endText" class="story" style="text-align:center"></div>
-    <button id="againBtn">Play again</button>
+    </div>
+    <div class="card-foot"><button id="againBtn">Play again</button></div>
   </div>
 </div>
 
