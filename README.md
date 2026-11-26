@@ -15,3 +15,7 @@ The output of the previous command will contain the address at which the applica
 
 Note, you will need to have Python and Django installed.  
 
+
+### Bonus: Catch Santa! (three.js game)
+`santa-game/` holds a standalone Christmas stealth game made with three.js. See
+[santa-game/README.md](santa-game/README.md).

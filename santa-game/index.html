@@ -1,0 +1,1237 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Catch Santa!</title>
+<style>
+  :root {
+    --red: #d42a2f; --gold: #f2c14e; --cream: #fff6e6; --ink: #1a0f0a;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #05070d; font-family: Georgia, "Times New Roman", serif; color: var(--cream); }
+  canvas { display: block; }
+  .overlay {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(ellipse at center, rgba(10,14,30,0.55), rgba(0,0,0,0.85));
+    backdrop-filter: blur(3px); z-index: 10; padding: 16px;
+  }
+  .hidden { display: none !important; }
+  .card {
+    max-width: 640px; width: 100%; max-height: calc(100vh - 32px); overflow-y: auto; background: rgba(28,12,10,0.88); border: 2px solid var(--gold);
+    border-radius: 14px; padding: 28px 32px; box-shadow: 0 0 60px rgba(242,193,78,0.25); text-align: center;
+  }
+  h1 { margin: 0 0 6px; font-size: 44px; color: var(--gold); letter-spacing: 1px; text-shadow: 0 2px 0 #7a1010; }
+  h2 { margin: 0 0 10px; color: var(--gold); }
+  .sub { font-style: italic; opacity: 0.85; margin-bottom: 16px; }
+  .story { text-align: left; line-height: 1.5; font-size: 16px; }
+  .controls { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; text-align: left; margin: 16px auto; font-size: 15px; max-width: 420px; }
+  .controls b { color: var(--gold); font-family: monospace; font-size: 14px; }
+  button {
+    margin-top: 14px; font: bold 20px Georgia, serif; padding: 12px 34px; border-radius: 40px; cursor: pointer;
+    border: 2px solid var(--gold); background: var(--red); color: white; box-shadow: 0 4px 0 #6d0e0e;
+  }
+  button:hover { filter: brightness(1.15); }
+  .tip { font-size: 14px; opacity: 0.8; margin-top: 10px; }
+
+  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
+  #objective { position: absolute; top: 16px; left: 16px; font-size: 16px; background: rgba(0,0,0,0.45); padding: 8px 12px; border-radius: 8px; max-width: 60vw; }
+  #film { position: absolute; top: 16px; right: 16px; font-size: 18px; background: rgba(0,0,0,0.45); padding: 8px 12px; border-radius: 8px; }
+  #meters { position: absolute; bottom: 18px; left: 16px; width: 230px; font-size: 13px; background: rgba(0,0,0,0.45); padding: 10px 12px; border-radius: 8px; }
+  .bar { height: 10px; background: rgba(255,255,255,0.15); border-radius: 5px; overflow: hidden; margin: 3px 0 8px; }
+  .bar > div { height: 100%; width: 0%; transition: width 0.1s linear; }
+  #noiseFill { background: linear-gradient(90deg, #6fd36f, #f2c14e, #e0402a); }
+  #susFill { background: linear-gradient(90deg, #f2c14e, #e0402a); }
+  #status { position: absolute; bottom: 18px; right: 16px; font-size: 14px; background: rgba(0,0,0,0.45); padding: 8px 12px; border-radius: 8px; text-align: right; }
+  #toast { position: absolute; bottom: 90px; left: 50%; transform: translateX(-50%); font-size: 20px; text-align: center; text-shadow: 0 2px 4px #000; opacity: 0; transition: opacity 0.3s; max-width: 90vw; }
+  #warn { position: absolute; top: 22%; left: 50%; transform: translateX(-50%); font-size: 30px; font-weight: bold; color: #ffdf6e; text-shadow: 0 0 12px #000, 0 2px 3px #000; opacity: 0; transition: opacity 0.2s; }
+  #viewfinder { position: absolute; left: 50%; top: 50%; width: 46vmin; height: 34vmin; transform: translate(-50%,-50%); }
+  #viewfinder i { position: absolute; width: 28px; height: 28px; border-color: rgba(255,255,255,0.55); border-style: solid; transition: border-color 0.15s; }
+  #viewfinder i:nth-child(1) { left: 0; top: 0; border-width: 2px 0 0 2px; }
+  #viewfinder i:nth-child(2) { right: 0; top: 0; border-width: 2px 2px 0 0; }
+  #viewfinder i:nth-child(3) { left: 0; bottom: 0; border-width: 0 0 2px 2px; }
+  #viewfinder i:nth-child(4) { right: 0; bottom: 0; border-width: 0 2px 2px 0; }
+  #viewfinder.lock i { border-color: #7dff8a; }
+  #dot { position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px; border-radius: 50%; background: rgba(255,255,255,0.7); }
+  #flash { position: fixed; inset: 0; background: white; opacity: 0; pointer-events: none; z-index: 8; }
+  #vignette { position: fixed; inset: 0; pointer-events: none; z-index: 4; background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.6)); }
+
+  .polaroid { background: #fbf8f0; padding: 14px 14px 18px; display: inline-block; transform: rotate(-2.5deg); box-shadow: 0 10px 30px rgba(0,0,0,0.6); margin: 10px 0 6px; max-width: 100%; }
+  .polaroid img { display: block; width: 100%; max-width: min(480px, 56vh); aspect-ratio: 4/3; object-fit: cover; filter: sepia(0.15) contrast(1.05); }
+  .polaroid .cap { color: #333; font: italic 20px "Comic Sans MS", "Bradley Hand", cursive; margin-top: 10px; }
+  .stars { font-size: 34px; color: var(--gold); letter-spacing: 6px; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+</script>
+</head>
+<body>
+<div id="vignette"></div>
+<div id="hud" class="hidden">
+  <div id="objective">Sneak downstairs and snap a photo of Santa!</div>
+  <div id="film">📷 Film: <span id="filmCount">●●●</span></div>
+  <div id="meters">
+    Your noise<div class="bar"><div id="noiseFill"></div></div>
+    Santa's suspicion<div class="bar"><div id="susFill"></div></div>
+  </div>
+  <div id="status">🎁 Presents left: <span id="presentCount">0</span><br><span id="santaDoing">Santa is coming down the chimney…</span></div>
+  <div id="viewfinder"><i></i><i></i><i></i><i></i></div>
+  <div id="dot"></div>
+  <div id="warn"></div>
+  <div id="toast"></div>
+</div>
+<div id="flash"></div>
+
+<div id="intro" class="overlay">
+  <div class="card">
+    <h1>🎅 Catch Santa! 🎄</h1>
+    <div class="sub">Christmas morning, 3:07 a.m.</div>
+    <div class="story">
+      You wake to a faint <i>jingle</i> and the crackle of a fire. Someone is downstairs.
+      Grab your camera, creep down the stairs, and get a photo of <b>Santa Claus</b> before he goes back up the chimney.
+      <br><br>
+      If he hears or sees you, he'll be gone in a flash. Grandpa always said <b>the 4th and 9th steps creak in the middle</b>.
+      Keep to the edges.
+    </div>
+    <div class="controls">
+      <b>Mouse</b><span>Look around</span>
+      <b>W A S D</b><span>Move</span>
+      <b>Hold C</b><span>Crouch & tiptoe (quiet)</span>
+      <b>Hold Shift</b><span>Run (loud!)</span>
+      <b>Click / Space</b><span>Take a photo (3 shots of film)</span>
+      <b>Esc</b><span>Pause</span>
+    </div>
+    <button id="startBtn">Tiptoe downstairs</button>
+    <div class="tip">Tip: when Santa turns around, freeze and crouch. Shots from close range score higher.</div>
+  </div>
+</div>
+
+<div id="pause" class="overlay hidden">
+  <div class="card"><h2>Paused</h2><div>Shh… Santa hasn't noticed a thing.</div><button id="resumeBtn">Resume</button></div>
+</div>
+
+<div id="end" class="overlay hidden">
+  <div class="card">
+    <h1 id="endTitle"></h1>
+    <div id="endPhoto"></div>
+    <div id="endStars" class="stars"></div>
+    <div id="endText" class="story" style="text-align:center"></div>
+    <button id="againBtn">Play again</button>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+
+// ---------------------------------------------------------------------------
+// Basics
+// ---------------------------------------------------------------------------
+const $ = (id) => document.getElementById(id);
+const rand = (a, b) => a + Math.random() * (b - a);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const angleDiff = (a, b) => { let d = b - a; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return d; };
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.15;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x05070d);
+const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.05, 120);
+camera.rotation.order = 'YXZ';
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+function canvasTex(w, h, draw, repeat) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  draw(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 8;
+  if (repeat) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(repeat[0], repeat[1]); }
+  return t;
+}
+
+const occluders = []; // things that block line of sight (for Santa's eyes and your camera)
+function addMesh(geo, mat, x, y, z, { occ = false, parent = scene } = {}) {
+  const m = new THREE.Mesh(geo, mat);
+  m.position.set(x, y, z);
+  parent.add(m);
+  if (occ) occluders.push(m);
+  return m;
+}
+const box = (w, h, d, mat, x, y, z, opts) => addMesh(new THREE.BoxGeometry(w, h, d), mat, x, y, z, opts);
+const std = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.85, ...extra });
+
+// ---------------------------------------------------------------------------
+// Textures
+// ---------------------------------------------------------------------------
+function planks(g, w, h) {
+  const rows = 8;
+  for (let r = 0; r < rows; r++) {
+    let x = -rand(0, 200);
+    while (x < w) {
+      const len = rand(170, 320);
+      g.fillStyle = `hsl(${rand(22, 30)},${rand(40, 50)}%,${rand(26, 36)}%)`;
+      g.fillRect(x, r * h / rows, len, h / rows);
+      for (let i = 0; i < 7; i++) {
+        g.strokeStyle = 'rgba(50,25,8,0.25)'; g.lineWidth = 1; g.beginPath();
+        const yy = r * h / rows + rand(3, h / rows - 3);
+        g.moveTo(x, yy); g.bezierCurveTo(x + len * 0.3, yy + rand(-3, 3), x + len * 0.6, yy + rand(-3, 3), x + len, yy); g.stroke();
+      }
+      g.strokeStyle = 'rgba(0,0,0,0.55)'; g.lineWidth = 2; g.strokeRect(x, r * h / rows, len, h / rows);
+      x += len;
+    }
+  }
+}
+const floorTex = canvasTex(512, 512, planks, [4, 4]);
+const stairTex = canvasTex(512, 512, planks, [1, 0.3]);
+
+const wallTex = canvasTex(256, 256, (g, w, h) => {
+  g.fillStyle = '#5b1c22'; g.fillRect(0, 0, w, h);
+  for (let x = 0; x < w; x += 64) { g.fillStyle = 'rgba(255,210,140,0.07)'; g.fillRect(x, 0, 24, h); }
+  g.fillStyle = 'rgba(242,193,78,0.22)';
+  for (let y = 16; y < h; y += 64) for (let x = 44; x < w; x += 64) {
+    g.beginPath(); g.moveTo(x, y - 7); g.lineTo(x + 6, y); g.lineTo(x, y + 7); g.lineTo(x - 6, y); g.fill();
+  }
+}, [8, 3]);
+
+const brickTex = canvasTex(256, 256, (g, w, h) => {
+  g.fillStyle = '#4a3a33'; g.fillRect(0, 0, w, h);
+  const bh = 32, bw = 64;
+  for (let r = 0; r < h / bh; r++) for (let c = -1; c < w / bw + 1; c++) {
+    g.fillStyle = `hsl(${rand(5, 15)},${rand(40, 55)}%,${rand(25, 36)}%)`;
+    g.fillRect(c * bw + (r % 2) * bw / 2 + 2, r * bh + 2, bw - 4, bh - 4);
+  }
+}, [2, 3]);
+
+const rugTex = canvasTex(512, 512, (g, w, h) => {
+  const cx = w / 2;
+  const rings = ['#6e1219', '#d9b35b', '#1f4a33', '#8c1b23', '#e7d6b0', '#6e1219'];
+  rings.forEach((col, i) => { g.fillStyle = col; g.beginPath(); g.arc(cx, cx, cx - i * 38, 0, Math.PI * 2); g.fill(); });
+  g.strokeStyle = 'rgba(242,193,78,0.6)'; g.lineWidth = 6;
+  for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2; g.beginPath(); g.moveTo(cx + Math.cos(a) * 40, cx + Math.sin(a) * 40); g.lineTo(cx + Math.cos(a) * 140, cx + Math.sin(a) * 140); g.stroke(); }
+});
+
+const skyTex = canvasTex(1024, 512, (g, w, h) => {
+  const grd = g.createLinearGradient(0, 0, 0, h);
+  grd.addColorStop(0, '#02040c'); grd.addColorStop(0.6, '#13204a'); grd.addColorStop(1, '#2c3c6e');
+  g.fillStyle = grd; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 260; i++) { g.fillStyle = `rgba(255,255,255,${rand(0.3, 1)})`; g.fillRect(rand(0, w), rand(0, h * 0.6), rand(1, 2.5), rand(1, 2.5)); }
+  g.fillStyle = '#fffbe8'; g.shadowColor = '#cfe0ff'; g.shadowBlur = 40; g.beginPath(); g.arc(w * 0.72, h * 0.18, 34, 0, Math.PI * 2); g.fill(); g.shadowBlur = 0;
+  // houses with warm windows
+  for (let i = 0; i < 7; i++) {
+    const x = i * 150 + rand(-20, 20), bw = rand(90, 130), bh = rand(60, 100), y = h * 0.78 - bh;
+    g.fillStyle = '#0b1022'; g.fillRect(x, y, bw, bh + 40);
+    g.beginPath(); g.moveTo(x - 10, y); g.lineTo(x + bw / 2, y - 45); g.lineTo(x + bw + 10, y); g.fill();
+    g.fillStyle = '#e8f0ff'; g.beginPath(); g.moveTo(x - 10, y); g.lineTo(x + bw / 2, y - 45); g.lineTo(x + bw + 10, y); g.lineTo(x + bw / 2, y - 36); g.fill();
+    g.fillStyle = '#ffc861';
+    for (let k = 0; k < 3; k++) if (Math.random() < 0.6) g.fillRect(x + 12 + k * 30, y + 20, 16, 18);
+  }
+  g.fillStyle = '#dfe8fb'; g.beginPath(); g.moveTo(0, h * 0.8);
+  for (let x = 0; x <= w; x += 40) g.lineTo(x, h * 0.8 + Math.sin(x * 0.01) * 10);
+  g.lineTo(w, h); g.lineTo(0, h); g.fill();
+});
+
+// ---------------------------------------------------------------------------
+// Room
+// ---------------------------------------------------------------------------
+// Layout (metres): living room x,z ∈ [-8, 8], ceiling at y = 6.
+// Upstairs landing: x ∈ [-8,-4], z ∈ [-8,-5] at y = 3. Stairs x ∈ [-8,-6], z from -5 (top) to 3 (bottom).
+const LANDING_Y = 3, STEP_COUNT = 12, STEP_D = 8 / STEP_COUNT, STEP_H = LANDING_Y / STEP_COUNT;
+const CREAKY = [3, 8]; // 4th and 9th steps
+
+const wallMat = new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.9 });
+const trimMat = std(0xe9e1cf, { roughness: 0.6 });
+const woodMat = new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.75 });
+const darkWood = std(0x4a2a17, { roughness: 0.6 });
+
+const floor = addMesh(new THREE.PlaneGeometry(16, 16), woodMat, 0, 0, 0);
+floor.rotation.x = -Math.PI / 2;
+const ceil = addMesh(new THREE.PlaneGeometry(16, 16), std(0xcfc6b8), 0, 6, 0);
+ceil.rotation.x = Math.PI / 2;
+
+const W = { occ: true };
+box(16.4, 6, 0.2, wallMat, 0, 3, -8.1, W);          // back
+box(0.2, 6, 16.4, wallMat, -8.1, 3, 0, W);          // left
+box(0.2, 6, 16.4, wallMat, 8.1, 3, 0, W);           // right
+// front wall with a window hole x ∈ [-1,3], y ∈ [1.2,4.2]
+box(7, 6, 0.2, wallMat, -4.5, 3, 8.1, W);
+box(5, 6, 0.2, wallMat, 5.5, 3, 8.1, W);
+box(4, 1.2, 0.2, wallMat, 1, 0.6, 8.1, W);
+box(4, 1.8, 0.2, wallMat, 1, 5.1, 8.1, W);
+// baseboards
+box(16, 0.18, 0.05, trimMat, 0, 0.09, -7.98); box(16, 0.18, 0.05, trimMat, 0, 0.09, 7.98);
+box(0.05, 0.18, 16, trimMat, 7.98, 0.09, 0); box(0.05, 0.18, 16, trimMat, -7.98, 0.09, 0);
+box(16, 0.2, 0.08, trimMat, 0, 5.9, -7.96); box(16, 0.2, 0.08, trimMat, 0, 5.9, 7.96);
+box(0.08, 0.2, 16, trimMat, 7.96, 5.9, 0); box(0.08, 0.2, 16, trimMat, -7.96, 5.9, 0);
+
+// window frame
+const frameMat = std(0xf2ede2, { roughness: 0.5 });
+box(4.2, 0.12, 0.3, frameMat, 1, 1.2, 8.0); box(4.2, 0.12, 0.3, frameMat, 1, 4.2, 8.0);
+box(0.12, 3.1, 0.3, frameMat, -1, 2.7, 8.0); box(0.12, 3.1, 0.3, frameMat, 3, 2.7, 8.0);
+box(0.06, 3, 0.08, frameMat, 1, 2.7, 8.05); box(4, 0.06, 0.08, frameMat, 1, 2.7, 8.05);
+box(4.4, 0.08, 0.45, frameMat, 1, 1.15, 7.85); // sill
+const glass = addMesh(new THREE.PlaneGeometry(4, 3), new THREE.MeshBasicMaterial({ color: 0x9fb8ff, transparent: true, opacity: 0.08 }), 1, 2.7, 8.08);
+glass.rotation.y = Math.PI;
+// curtains
+const curtainMat = std(0x1d4a2e, { roughness: 1, side: THREE.DoubleSide });
+for (const x of [-1.5, 3.5]) box(0.7, 4.6, 0.12, curtainMat, x, 3.2, 7.88);
+box(5.6, 0.08, 0.08, darkWood, 1, 5.45, 7.85);
+// wreath above the window
+const wreath = addMesh(new THREE.TorusGeometry(0.35, 0.12, 10, 24), std(0x1f5a2a), 1, 4.85, 7.95);
+for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2; addMesh(new THREE.SphereGeometry(0.04, 8, 8), std(0xd42a2f, { emissive: 0x550000 }), 1 + Math.cos(a) * 0.35, 4.85 + Math.sin(a) * 0.35, 7.88); }
+// outside: sky backdrop, snowy ground, falling snow
+const sky = addMesh(new THREE.PlaneGeometry(40, 20), new THREE.MeshBasicMaterial({ map: skyTex }), 1, 5, 18);
+sky.rotation.y = Math.PI;
+const snowGround = addMesh(new THREE.PlaneGeometry(40, 12), std(0xb8c8ec, { roughness: 1 }), 1, -0.05, 14);
+snowGround.rotation.x = -Math.PI / 2;
+const SNOW_N = 700;
+const snowGeo = new THREE.BufferGeometry();
+const snowPos = new Float32Array(SNOW_N * 3);
+for (let i = 0; i < SNOW_N; i++) { snowPos[i * 3] = rand(-6, 8); snowPos[i * 3 + 1] = rand(0, 8); snowPos[i * 3 + 2] = rand(8.4, 16); }
+snowGeo.setAttribute('position', new THREE.BufferAttribute(snowPos, 3));
+const snow = new THREE.Points(snowGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.06, transparent: true, opacity: 0.9 }));
+scene.add(snow);
+
+// --- Landing (upstairs) ---
+box(4, LANDING_Y, 3, wallMat, -6, LANDING_Y / 2, -6.5, W);
+box(4, 0.08, 3, new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.75 }), -6, LANDING_Y - 0.02, -6.5);
+box(2.04, 0.2, 0.06, trimMat, -5, LANDING_Y - 0.1, -4.98);
+box(0.06, 0.2, 3.04, trimMat, -3.98, LANDING_Y - 0.1, -6.5);
+// landing runner rug
+box(1.0, 0.01, 2.6, std(0x7a1820), -5.2, LANDING_Y + 0.025, -6.6);
+// bedroom door behind the player, with warm light leaking out
+box(1.1, 2.2, 0.06, std(0xe6dccb, { roughness: 0.6 }), -5.6, LANDING_Y + 1.1, -7.96);
+box(1.3, 0.1, 0.08, trimMat, -5.6, LANDING_Y + 2.25, -7.95);
+addMesh(new THREE.SphereGeometry(0.045, 10, 10), std(0xd4a640, { metalness: 0.8, roughness: 0.3 }), -5.2, LANDING_Y + 1.0, -7.9);
+box(1.0, 0.02, 0.02, new THREE.MeshBasicMaterial({ color: 0xffd38a }), -5.6, LANDING_Y + 0.01, -7.92);
+const doorGlow = new THREE.PointLight(0xffc77a, 1.2, 4, 2);
+doorGlow.position.set(-5.6, LANDING_Y + 0.15, -7.6); scene.add(doorGlow);
+
+// railing helper: posts + rail between two points
+const railMat = std(0xefe7d6, { roughness: 0.5 });
+function railing(x1, y1, z1, x2, y2, z2, spacing, postBase = null) {
+  const a = new THREE.Vector3(x1, y1 + 0.95, z1), b = new THREE.Vector3(x2, y2 + 0.95, z2);
+  const len = a.distanceTo(b);
+  const rail = addMesh(new THREE.CylinderGeometry(0.045, 0.045, len, 8), darkWood, (a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2);
+  rail.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize());
+  const n = Math.max(1, Math.round(len / spacing));
+  for (let i = 0; i <= n; i++) {
+    const t = i / n, x = lerp(x1, x2, t), z = lerp(z1, z2, t);
+    const base = postBase ? postBase(x, z) : lerp(y1, y2, t);
+    const top = lerp(a.y, b.y, t);
+    addMesh(new THREE.CylinderGeometry(0.025, 0.025, top - base, 6), railMat, x, (top + base) / 2, z);
+  }
+}
+railing(-6, LANDING_Y, -5, -4, LANDING_Y, -5, 0.22);
+railing(-4, LANDING_Y, -8, -4, LANDING_Y, -5, 0.22);
+
+// --- Stairs ---
+const stairSide = std(0xe6dccb, { roughness: 0.7 });
+const treadMat = new THREE.MeshStandardMaterial({ map: stairTex, roughness: 0.6 });
+const creakMat = std(0x3a1f10, { roughness: 0.7 });
+for (let i = 0; i < STEP_COUNT - 1; i++) {
+  const h = LANDING_Y - (i + 1) * STEP_H;
+  const zc = -5 + i * STEP_D + STEP_D / 2;
+  box(2, h, STEP_D, stairSide, -7, h / 2, zc, W);
+  box(2.06, 0.05, STEP_D + 0.03, treadMat, -7, h, zc);
+  if (CREAKY.includes(i)) box(0.62, 0.056, STEP_D + 0.035, creakMat, -7, h, zc); // the suspicious board
+}
+// carpet runner down the stairs (edges stay bare wood)
+for (let i = 0; i < STEP_COUNT - 1; i++) {
+  if (CREAKY.includes(i)) continue;
+  const h = LANDING_Y - (i + 1) * STEP_H;
+  box(0.9, 0.06, STEP_D, std(0x7a1820), -7, h + 0.005, -5 + i * STEP_D + STEP_D / 2);
+}
+const stepH = (z) => LANDING_Y - (Math.floor((z + 5) / STEP_D) + 1) * STEP_H;
+railing(-6, LANDING_Y - STEP_H, -5, -6, STEP_H * 2, 1.6, 0.34, (x, z) => Math.max(0, stepH(Math.min(z, 2.3))));
+box(0.16, 1.3, 0.16, darkWood, -6, 0.65, 2.6); // newel post
+addMesh(new THREE.SphereGeometry(0.11, 12, 12), darkWood, -6, 1.36, 2.6);
+// garland on the banister
+for (let i = 0; i < 26; i++) {
+  const t = i / 25, z = lerp(-5, 1.6, t), y = lerp(LANDING_Y - STEP_H, STEP_H * 2, t) + 0.95 - Math.abs(Math.sin(t * Math.PI * 4)) * 0.18;
+  addMesh(new THREE.SphereGeometry(0.09, 8, 8), std(0x1f5a2a), -6, y, z);
+  if (i % 3 === 0) addMesh(new THREE.SphereGeometry(0.035, 8, 8), new THREE.MeshBasicMaterial({ color: [0xff4040, 0xffd24a, 0x5aa0ff][i % 9 / 3 | 0] }), -6.07, y - 0.05, z);
+}
+
+// --- Fireplace (right wall) ---
+const brickMat = new THREE.MeshStandardMaterial({ map: brickTex, roughness: 0.95 });
+box(1, 2.2, 0.7, brickMat, 7.5, 1.1, -1.45, W);
+box(1, 2.2, 0.7, brickMat, 7.5, 1.1, 1.45, W);
+box(1, 0.6, 2.2, brickMat, 7.5, 1.9, 0, W);
+box(0.2, 1.6, 2.2, std(0x120a08), 7.92, 0.8, 0);
+box(0.6, 0.02, 2.2, std(0x1a1210), 7.6, 0.02, 0);
+box(1.6, 0.12, 4.2, std(0x6b6460, { roughness: 0.9 }), 7.25, 0.06, 0);
+box(1.35, 0.15, 4.2, darkWood, 7.33, 2.28, 0);
+box(0.8, 3.65, 3, brickMat, 7.6, 4.18, 0, W);
+// logs + fire
+const logMat = std(0x3b2616);
+for (const [z, r] of [[-0.3, 0.3], [0.3, -0.3]]) { const l = addMesh(new THREE.CylinderGeometry(0.1, 0.1, 1.0, 10), logMat, 7.55, 0.14, z); l.rotation.x = Math.PI / 2; l.rotation.z = r; }
+const flames = [];
+const flameMat = (c) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false });
+for (let i = 0; i < 9; i++) {
+  const f = addMesh(new THREE.ConeGeometry(rand(0.09, 0.16), rand(0.4, 0.7), 8), flameMat(i % 3 === 0 ? 0xffd060 : 0xff6a1a), 7.55 + rand(-0.12, 0.12), 0.45, rand(-0.45, 0.45));
+  f.userData.base = f.position.y; f.userData.seed = rand(0, 100);
+  flames.push(f);
+}
+const fireLight = new THREE.PointLight(0xff8a3a, 22, 0, 1.8);
+fireLight.position.set(7.0, 0.9, 0); scene.add(fireLight);
+// stockings
+const stockings = [];
+const stockingColors = [0xc41e24, 0x1f6a38, 0xc41e24];
+[-1.2, 0, 1.2].forEach((z, i) => {
+  const g = new THREE.Group(); g.position.set(6.62, 2.18, z); scene.add(g);
+  const m = std(stockingColors[i], { roughness: 1 });
+  addMesh(new THREE.BoxGeometry(0.08, 0.55, 0.26), m, 0, -0.35, 0, { parent: g });
+  addMesh(new THREE.BoxGeometry(0.08, 0.2, 0.42), m, 0, -0.62, 0.08, { parent: g });
+  addMesh(new THREE.BoxGeometry(0.1, 0.12, 0.3), std(0xf4f1ea, { roughness: 1 }), 0, -0.08, 0, { parent: g });
+  const stuff = new THREE.Group(); stuff.visible = false; g.add(stuff);
+  const cane = addMesh(new THREE.CylinderGeometry(0.025, 0.025, 0.35, 8), std(0xffffff, { emissive: 0x330000 }), 0, 0.05, -0.05, { parent: stuff });
+  addMesh(new THREE.TorusGeometry(0.06, 0.025, 8, 12, Math.PI), std(0xd42a2f), 0, 0.22, -0.11, { parent: stuff }).rotation.y = Math.PI / 2;
+  addMesh(new THREE.BoxGeometry(0.1, 0.12, 0.12), std(0x2a6ad4), 0, 0.0, 0.07, { parent: stuff });
+  stockings.push({ g, stuff, filled: false });
+});
+// mantel garland and candles
+for (let i = 0; i < 18; i++) addMesh(new THREE.SphereGeometry(0.08, 8, 8), std(0x1f5a2a), 6.7, 2.36, -2 + i * 4 / 17);
+for (const z of [-1.7, 1.7]) {
+  addMesh(new THREE.CylinderGeometry(0.05, 0.05, 0.3, 10), std(0xf4ead4), 7.4, 2.5, z);
+  addMesh(new THREE.SphereGeometry(0.03, 8, 8), new THREE.MeshBasicMaterial({ color: 0xffc860 }), 7.4, 2.7, z);
+}
+// painting above the mantel
+const paintTex = canvasTex(256, 180, (g, w, h) => {
+  g.fillStyle = '#1b2a4a'; g.fillRect(0, 0, w, h);
+  g.fillStyle = '#e8eef8'; g.fillRect(0, h * 0.7, w, h);
+  for (let i = 0; i < 5; i++) { g.fillStyle = '#123'; g.beginPath(); const x = 30 + i * 50; g.moveTo(x, h * 0.72); g.lineTo(x + 18, h * 0.3 + rand(-10, 10)); g.lineTo(x + 36, h * 0.72); g.fill(); }
+  g.fillStyle = '#fff'; for (let i = 0; i < 60; i++) g.fillRect(rand(0, w), rand(0, h), 2, 2);
+});
+const painting = addMesh(new THREE.PlaneGeometry(1.6, 1.1), new THREE.MeshStandardMaterial({ map: paintTex }), 7.19, 3.7, 0);
+painting.rotation.y = -Math.PI / 2;
+box(0.05, 1.25, 1.75, std(0xb08a3a, { metalness: 0.5, roughness: 0.4 }), 7.21, 3.7, 0);
+
+// --- Christmas tree ---
+const TREE = new THREE.Vector3(5.4, 0, -5.4);
+addMesh(new THREE.CylinderGeometry(0.14, 0.18, 0.6, 10), std(0x4a2e18), TREE.x, 0.3, TREE.z);
+const skirt = addMesh(new THREE.CircleGeometry(1.7, 32), std(0x9b1b22, { roughness: 1 }), TREE.x, 0.015, TREE.z);
+skirt.rotation.x = -Math.PI / 2;
+const treeMat = std(0x1c5228, { roughness: 0.9 });
+const treeLayers = [[1.6, 1.6, 1.2], [1.3, 1.5, 2.1], [1.0, 1.3, 2.9], [0.65, 1.1, 3.6]];
+const bulbs = [];
+const bulbColors = [0xff3b3b, 0xffd24a, 0x4aa0ff, 0x5aff7a, 0xff7ae0];
+for (const [r, h, y] of treeLayers) {
+  addMesh(new THREE.ConeGeometry(r, h, 18), treeMat, TREE.x, y, TREE.z, { occ: true });
+  for (let i = 0; i < 16; i++) {
+    const a = rand(0, Math.PI * 2), t = rand(0.15, 0.95);
+    const rr = r * t + 0.03, yy = y + h / 2 - h * t;
+    const c = bulbColors[(Math.random() * bulbColors.length) | 0];
+    const m = new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 2 });
+    const b = addMesh(new THREE.SphereGeometry(0.05, 8, 8), m, TREE.x + Math.cos(a) * rr, yy, TREE.z + Math.sin(a) * rr);
+    b.userData.seed = rand(0, 10);
+    bulbs.push(b);
+  }
+  // baubles
+  for (let i = 0; i < 6; i++) {
+    const a = rand(0, Math.PI * 2), t = rand(0.4, 0.95);
+    addMesh(new THREE.SphereGeometry(0.09, 12, 12), std([0xd4af37, 0xc0c0c8, 0xb01a20][i % 3], { metalness: 0.9, roughness: 0.25 }), TREE.x + Math.cos(a) * r * t, y + h / 2 - h * t, TREE.z + Math.sin(a) * r * t);
+  }
+}
+const starShape = new THREE.Shape();
+for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2 + Math.PI / 2, r = i % 2 ? 0.11 : 0.26; i ? starShape.lineTo(Math.cos(a) * r, Math.sin(a) * r) : starShape.moveTo(Math.cos(a) * r, Math.sin(a) * r); }
+const star = addMesh(new THREE.ExtrudeGeometry(starShape, { depth: 0.05, bevelEnabled: false }), new THREE.MeshStandardMaterial({ color: 0xffd860, emissive: 0xffc030, emissiveIntensity: 2.5 }), TREE.x, 4.3, TREE.z);
+star.rotation.y = Math.PI / 4;
+const treeLight = new THREE.PointLight(0xffb870, 9, 0, 1.8);
+treeLight.position.set(TREE.x - 0.8, 2.0, TREE.z + 0.8); scene.add(treeLight);
+
+// --- Living room furniture ---
+const sofaMat = std(0x6e2a24, { roughness: 1 });
+box(1.1, 0.45, 3.2, sofaMat, -0.45, 0.25, 0, W);
+box(0.9, 0.16, 1.5, std(0x7d332b, { roughness: 1 }), -0.35, 0.55, -0.77);
+box(0.9, 0.16, 1.5, std(0x7d332b, { roughness: 1 }), -0.35, 0.55, 0.77);
+box(0.3, 0.95, 3.2, sofaMat, -0.9, 0.85, 0, W);
+box(1.1, 0.7, 0.25, sofaMat, -0.45, 0.45, -1.62, W);
+box(1.1, 0.7, 0.25, sofaMat, -0.45, 0.45, 1.62, W);
+box(0.15, 0.45, 0.45, std(0x2a6a3a, { roughness: 1 }), -0.65, 0.85, 0.9).rotation.x = 0.3; // throw pillow
+const rug = addMesh(new THREE.CircleGeometry(2.6, 40), new THREE.MeshStandardMaterial({ map: rugTex, roughness: 1 }), 2.6, 0.012, 0);
+rug.rotation.x = -Math.PI / 2;
+// coffee table with cookies and milk
+box(1.0, 0.07, 1.6, darkWood, 2.3, 0.46, 0);
+for (const [dx, dz] of [[-0.42, -0.72], [0.42, -0.72], [-0.42, 0.72], [0.42, 0.72]]) box(0.07, 0.44, 0.07, darkWood, 2.3 + dx, 0.22, dz);
+addMesh(new THREE.CylinderGeometry(0.2, 0.17, 0.02, 24), std(0xf6f2ea, { roughness: 0.3 }), 2.25, 0.505, -0.15);
+const cookies = [];
+for (let i = 0; i < 4; i++) {
+  const a = i / 4 * Math.PI * 2;
+  const c = addMesh(new THREE.CylinderGeometry(0.06, 0.06, 0.018, 14), std(0xb07a3a), 2.25 + Math.cos(a) * 0.09, 0.525 + i * 0.002, -0.15 + Math.sin(a) * 0.09);
+  for (let k = 0; k < 3; k++) addMesh(new THREE.SphereGeometry(0.01, 6, 6), std(0x2a1408), rand(-0.03, 0.03), 0.01, rand(-0.03, 0.03), { parent: c });
+  cookies.push(c);
+}
+addMesh(new THREE.CylinderGeometry(0.05, 0.045, 0.16, 16), new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.3, roughness: 0.1 }), 2.3, 0.58, 0.25);
+const milk = addMesh(new THREE.CylinderGeometry(0.043, 0.04, 0.13, 16), std(0xfafafa, { roughness: 0.4 }), 2.3, 0.565, 0.25);
+const noteTex = canvasTex(256, 160, (g, w, h) => { g.fillStyle = '#fff8e4'; g.fillRect(0, 0, w, h); g.fillStyle = '#b01a20'; g.font = 'italic 40px Georgia'; g.fillText('For Santa', 30, 70); g.font = '44px serif'; g.fillText('♥ ♥ ♥', 50, 130); });
+const note = addMesh(new THREE.PlaneGeometry(0.26, 0.16), new THREE.MeshStandardMaterial({ map: noteTex }), 2.45, 0.505, -0.45);
+note.rotation.x = -Math.PI / 2; note.rotation.z = 1.2;
+// armchair by the window
+const chairMat = std(0x2c4a6a, { roughness: 1 });
+box(1.0, 0.5, 1.0, chairMat, 4.4, 0.25, 5.6, W);
+box(1.0, 1.0, 0.25, chairMat, 4.4, 0.75, 6.1, W);
+box(0.2, 0.7, 1.0, chairMat, 3.9, 0.45, 5.6); box(0.2, 0.7, 1.0, chairMat, 4.9, 0.45, 5.6);
+// grandfather clock
+box(0.6, 2.4, 0.5, darkWood, -7.6, 1.2, 5.2, W);
+const clockFace = addMesh(new THREE.CircleGeometry(0.2, 24), std(0xf3ead2), -7.29, 1.95, 5.2);
+clockFace.rotation.y = Math.PI / 2;
+const hand1 = box(0.01, 0.15, 0.02, std(0x111111), -7.28, 2.0, 5.2); hand1.rotation.x = 0.4;
+const hand2 = box(0.01, 0.11, 0.02, std(0x111111), -7.28, 1.92, 5.24); hand2.rotation.x = -1.2;
+const pendulum = new THREE.Group(); pendulum.position.set(-7.28, 1.6, 5.2); scene.add(pendulum);
+addMesh(new THREE.CylinderGeometry(0.01, 0.01, 0.6), std(0xc8a040, { metalness: 0.8 }), 0, -0.3, 0, { parent: pendulum });
+addMesh(new THREE.CylinderGeometry(0.08, 0.08, 0.02, 16), std(0xc8a040, { metalness: 0.8, roughness: 0.3 }), 0, -0.62, 0, { parent: pendulum }).rotation.z = Math.PI / 2;
+// side table with a sleeping cat-shaped cushion... just a lamp (off)
+box(0.6, 0.6, 0.6, darkWood, -0.5, 0.3, -2.6);
+addMesh(new THREE.CylinderGeometry(0.05, 0.08, 0.4, 10), std(0xc8a040, { metalness: 0.6 }), -0.5, 0.8, -2.6);
+addMesh(new THREE.CylinderGeometry(0.15, 0.25, 0.3, 16, 1, true), std(0xf0e4c8, { side: THREE.DoubleSide }), -0.5, 1.1, -2.6);
+// family photos on the left wall
+for (const [z, y] of [[-2.5, 2.2], [-1.4, 2.5], [-0.3, 2.1]]) {
+  box(0.04, 0.6, 0.48, std(0xb08a3a, { metalness: 0.4 }), -7.97, y, z);
+  box(0.045, 0.5, 0.38, std([0x6a8aa0, 0xa07a6a, 0x8aa06a][Math.abs(z) % 3 | 0]), -7.96, y, z);
+}
+
+// Lighting
+scene.add(new THREE.HemisphereLight(0x5a6a9a, 0x20140a, 0.75));
+const moon = new THREE.DirectionalLight(0x9fb4ff, 0.45);
+moon.position.set(1, 6, 14); scene.add(moon);
+const windowGlow = new THREE.PointLight(0x7f9cff, 3, 9, 1.5);
+windowGlow.position.set(1, 2.6, 7.3); scene.add(windowGlow);
+const flashLight = new THREE.PointLight(0xffffff, 0, 30, 1.2);
+camera.add(flashLight); scene.add(camera);
+
+// Collision for the player: [minX, maxX, minZ, maxZ]
+const blockers = [
+  [-1.05, 0.15, -1.8, 1.8],   // sofa
+  [1.75, 2.85, -0.85, 0.85],  // coffee table
+  [6.55, 8, -2.1, 2.1],       // fireplace
+  [-6.07, -5.93, -5, 2.4],    // stair banister
+  [-6.1, -5.9, 2.5, 2.7],     // newel post
+  [-7.95, -7.25, 4.9, 5.5],   // clock
+  [3.85, 4.95, 5.05, 6.25],   // armchair
+  [-0.85, -0.15, -2.95, -2.25], // side table
+];
+const TREE_R = 1.45;
+
+function floorAt(x, z) {
+  if (x < -4 && z < -5) return LANDING_Y;
+  if (x < -6 && z >= -5 && z < 3) return Math.max(0, stepH(z));
+  return 0;
+}
+const stepIndexAt = (x, z) => (x < -6 && z >= -5 && z < 3) ? Math.floor((z + 5) / STEP_D) : -1;
+
+// ---------------------------------------------------------------------------
+// Presents
+// ---------------------------------------------------------------------------
+const presentColors = [[0xc41e24, 0xf2c14e], [0x1f6a38, 0xf4f1ea], [0x2a5ad4, 0xf2c14e], [0xf2c14e, 0xc41e24], [0x8a2ad4, 0xf4f1ea], [0xf4f1ea, 0xc41e24]];
+const presents = [];
+function makePresent(x, z) {
+  const g = new THREE.Group();
+  const s = rand(0.32, 0.55), h = rand(0.25, 0.45);
+  const [c, rc] = presentColors[(Math.random() * presentColors.length) | 0];
+  const ribbon = std(rc, { roughness: 0.4, metalness: 0.2 });
+  addMesh(new THREE.BoxGeometry(s, h, s * rand(0.8, 1.2)), std(c, { roughness: 0.5 }), 0, h / 2, 0, { parent: g });
+  addMesh(new THREE.BoxGeometry(s + 0.01, h + 0.01, 0.06), ribbon, 0, h / 2, 0, { parent: g });
+  addMesh(new THREE.BoxGeometry(0.06, h + 0.01, s * 1.2 + 0.01), ribbon, 0, h / 2, 0, { parent: g });
+  for (const r of [0.7, -0.7]) { const bow = addMesh(new THREE.TorusGeometry(0.06, 0.02, 8, 12), ribbon, 0, h + 0.05, 0, { parent: g }); bow.rotation.y = r; }
+  g.position.set(x, 0, z);
+  g.rotation.y = rand(0, Math.PI);
+  g.scale.setScalar(0.01);
+  scene.add(g);
+  presents.push(g);
+  return g;
+}
+
+// ---------------------------------------------------------------------------
+// Santa
+// ---------------------------------------------------------------------------
+function buildSanta() {
+  const red = std(0xc41e24, { roughness: 0.75 });
+  const white = std(0xf6f3ec, { roughness: 1 });
+  const black = std(0x141414, { roughness: 0.45 });
+  const skin = std(0xf0c09c, { roughness: 0.8 });
+  const gold = std(0xe8b830, { metalness: 0.85, roughness: 0.3 });
+  const brown = std(0x7a5230, { roughness: 1 });
+  const root = new THREE.Group();
+  const legs = [];
+  for (const s of [-1, 1]) {
+    const hip = new THREE.Group(); hip.position.set(0.17 * s, 0.85, 0); root.add(hip);
+    addMesh(new THREE.CylinderGeometry(0.14, 0.12, 0.6, 12), red, 0, -0.3, 0, { parent: hip });
+    addMesh(new THREE.CylinderGeometry(0.15, 0.15, 0.1, 12), white, 0, -0.58, 0, { parent: hip });
+    addMesh(new THREE.BoxGeometry(0.22, 0.22, 0.38), black, 0, -0.74, 0.06, { parent: hip });
+    legs.push(hip);
+  }
+  const upper = new THREE.Group(); upper.position.y = 0.85; root.add(upper);
+  const chest = addMesh(new THREE.CylinderGeometry(0.34, 0.44, 0.8, 18), red, 0, 0.38, 0, { parent: upper });
+  addMesh(new THREE.SphereGeometry(0.44, 18, 14), red, 0, 0.25, 0.05, { parent: upper }).scale.set(1, 0.9, 0.95);
+  addMesh(new THREE.TorusGeometry(0.43, 0.075, 8, 24), white, 0, 0.0, 0, { parent: upper }).rotation.x = Math.PI / 2;
+  addMesh(new THREE.CylinderGeometry(0.455, 0.455, 0.12, 24), black, 0, 0.22, 0.02, { parent: upper });
+  addMesh(new THREE.BoxGeometry(0.18, 0.15, 0.05), gold, 0, 0.22, 0.47, { parent: upper });
+  addMesh(new THREE.BoxGeometry(0.1, 0.11, 0.06), black, 0, 0.22, 0.48, { parent: upper });
+  for (const y of [0.45, 0.6]) addMesh(new THREE.SphereGeometry(0.03, 8, 8), white, 0, y, 0.39, { parent: upper });
+  addMesh(new THREE.SphereGeometry(0.36, 16, 10), red, 0, 0.76, 0, { parent: upper }).scale.set(1.15, 0.55, 0.9);
+  const arms = [];
+  for (const s of [-1, 1]) {
+    const sh = new THREE.Group(); sh.position.set(0.44 * s, 0.74, 0); sh.rotation.z = 0.18 * s; upper.add(sh);
+    addMesh(new THREE.CylinderGeometry(0.1, 0.12, 0.55, 10), red, 0, -0.27, 0, { parent: sh });
+    addMesh(new THREE.CylinderGeometry(0.13, 0.13, 0.09, 10), white, 0, -0.55, 0, { parent: sh });
+    addMesh(new THREE.SphereGeometry(0.11, 10, 10), black, 0, -0.66, 0, { parent: sh });
+    arms.push(sh);
+  }
+  const head = new THREE.Group(); head.position.y = 1.07; upper.add(head);
+  addMesh(new THREE.SphereGeometry(0.22, 18, 16), skin, 0, 0, 0, { parent: head });
+  addMesh(new THREE.SphereGeometry(0.055, 10, 10), std(0xe8908a), 0, 0.0, 0.22, { parent: head });
+  for (const s of [-1, 1]) {
+    addMesh(new THREE.SphereGeometry(0.024, 8, 8), black, 0.08 * s, 0.06, 0.195, { parent: head });
+    addMesh(new THREE.BoxGeometry(0.09, 0.025, 0.03), white, 0.08 * s, 0.11, 0.2, { parent: head });
+    addMesh(new THREE.SphereGeometry(0.075, 10, 8), white, 0.065 * s, -0.045, 0.2, { parent: head }).scale.set(1.4, 0.55, 0.7);
+    addMesh(new THREE.SphereGeometry(0.04, 8, 8), std(0xf0a090), 0.12 * s, -0.0, 0.17, { parent: head });
+  }
+  addMesh(new THREE.SphereGeometry(0.25, 16, 14), white, 0, -0.16, 0.08, { parent: head }).scale.set(1.05, 1.3, 0.75);
+  const hat = new THREE.Group(); hat.position.y = 0.12; head.add(hat);
+  addMesh(new THREE.TorusGeometry(0.21, 0.06, 8, 20), white, 0, 0, 0, { parent: hat }).rotation.x = Math.PI / 2;
+  const tip = new THREE.Group(); tip.position.y = 0.03; tip.rotation.z = -0.55; tip.rotation.x = -0.25; hat.add(tip);
+  addMesh(new THREE.ConeGeometry(0.21, 0.5, 16), red, 0, 0.25, 0, { parent: tip });
+  addMesh(new THREE.SphereGeometry(0.075, 10, 10), white, 0, 0.52, 0, { parent: tip });
+  const sack = new THREE.Group(); sack.position.set(0, 0.55, -0.5); upper.add(sack);
+  addMesh(new THREE.SphereGeometry(0.42, 14, 12), brown, 0, 0, 0, { parent: sack }).scale.set(1, 1.15, 0.85);
+  addMesh(new THREE.CylinderGeometry(0.06, 0.12, 0.16, 10), brown, 0, 0.5, 0, { parent: sack });
+  addMesh(new THREE.TorusGeometry(0.07, 0.02, 6, 12), gold, 0, 0.47, 0, { parent: sack }).rotation.x = Math.PI / 2;
+  // "?" / "!" bubble
+  const bubbleCanvas = document.createElement('canvas'); bubbleCanvas.width = bubbleCanvas.height = 128;
+  const bubbleTex = new THREE.CanvasTexture(bubbleCanvas);
+  const bubble = new THREE.Sprite(new THREE.SpriteMaterial({ map: bubbleTex, depthTest: false, transparent: true }));
+  bubble.position.y = 2.55; bubble.scale.setScalar(0.6); bubble.renderOrder = 10; root.add(bubble);
+  root.traverse((o) => { if (o.isMesh) o.userData.santa = true; });
+  scene.add(root);
+  return { root, legs, arms, upper, head, sack, chest, bubble, bubbleCanvas, bubbleTex, bubbleSym: '' };
+}
+const santa = buildSanta();
+function setBubble(sym, color) {
+  if (santa.bubbleSym === sym + color) return;
+  santa.bubbleSym = sym + color;
+  const g = santa.bubbleCanvas.getContext('2d');
+  g.clearRect(0, 0, 128, 128);
+  santa.bubble.visible = !!sym;
+  if (!sym) return;
+  g.fillStyle = 'rgba(255,255,255,0.92)'; g.beginPath(); g.arc(64, 60, 46, 0, Math.PI * 2); g.fill();
+  g.beginPath(); g.moveTo(50, 100); g.lineTo(64, 124); g.lineTo(76, 100); g.fill();
+  g.fillStyle = color; g.font = 'bold 72px Georgia'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(sym, 64, 64);
+  santa.bubbleTex.needsUpdate = true;
+}
+setBubble('', '');
+
+// Santa's to-do list for the night
+const TASKS = [
+  { type: 'present', path: [[3.9, -3.9]], face: [TREE.x, TREE.z], dur: 4.5, label: 'Santa is putting presents under the tree' },
+  { type: 'present', path: [[3.3, -5.8]], face: [TREE.x, TREE.z], dur: 4.5, label: 'Santa is putting presents under the tree' },
+  { type: 'cookies', path: [[2.0, -1.8], [1.3, 0]], face: [2.3, 0], dur: 8.5, label: 'Santa is eating the cookies!' },
+  { type: 'stocking', idx: 0, path: [[1.3, -1.8], [6.1, -1.2]], face: [8, -1.2], dur: 3.2, label: 'Santa is filling the stockings' },
+  { type: 'stocking', idx: 1, path: [[6.1, 0]], face: [8, 0], dur: 3.2, label: 'Santa is filling the stockings' },
+  { type: 'stocking', idx: 2, path: [[6.1, 1.2]], face: [8, 1.2], dur: 3.2, label: 'Santa is filling the stockings' },
+  { type: 'present', path: [[5.7, -3.3]], face: [TREE.x, TREE.z], dur: 4.5, label: 'Santa is putting presents under the tree' },
+  { type: 'present', path: [[7.0, -4.4]], face: [TREE.x, TREE.z], dur: 4.5, label: 'Santa is putting the last present under the tree' },
+  { type: 'leave', path: [[6.2, 0]], face: [8, 0], dur: 1.8, label: 'Santa is heading for the chimney!' },
+];
+const TOTAL_PRESENTS = TASKS.filter((t) => t.type === 'present').length;
+
+const S = {
+  pos: new THREE.Vector3(6.3, 6, 0), heading: -Math.PI / 2, headYaw: 0,
+  state: 'waiting', timer: 0, taskIdx: -1, path: [], task: null,
+  suspicion: 0, glanceTimer: rand(4, 6), glanceT: 0, glanceYaw: 0,
+  invest: null, presentsLeft: 0, rise: 0, walkPhase: 0, lean: 0, speed: 0,
+  cookiesEaten: 0, sawPlayerT: 0, jingleAcc: 0, fleeReason: '',
+};
+
+// ---------------------------------------------------------------------------
+// Audio (all synthesized)
+// ---------------------------------------------------------------------------
+let actx = null, master, noiseBuf, fireGain;
+function initAudio() {
+  if (actx) return;
+  try {
+    actx = new (window.AudioContext || window.webkitAudioContext)();
+    master = actx.createGain(); master.gain.value = 0.8; master.connect(actx.destination);
+    noiseBuf = actx.createBuffer(1, actx.sampleRate * 2, actx.sampleRate);
+    const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    const src = actx.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+    const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 420;
+    fireGain = actx.createGain(); fireGain.gain.value = 0;
+    src.connect(lp).connect(fireGain).connect(master); src.start();
+  } catch (e) { actx = null; }
+}
+function noiseBurst(dur, freq, type, vol, q = 1, delay = 0) {
+  if (!actx || vol <= 0.001) return;
+  const t = actx.currentTime + delay;
+  const s = actx.createBufferSource(); s.buffer = noiseBuf;
+  const f = actx.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q;
+  const g = actx.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0005, t + dur);
+  s.connect(f).connect(g).connect(master); s.start(t, Math.random() * 1.5); s.stop(t + dur + 0.05);
+}
+const sfxStep = (vol, wood) => noiseBurst(wood ? 0.12 : 0.08, wood ? 520 : 260, 'lowpass', vol, 1.5);
+function sfxCreak() {
+  if (!actx) return;
+  const t = actx.currentTime;
+  const o = actx.createOscillator(); o.type = 'sawtooth';
+  o.frequency.setValueAtTime(70, t); o.frequency.linearRampToValueAtTime(130, t + 0.3); o.frequency.linearRampToValueAtTime(62, t + 0.85);
+  const bp = actx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 850; bp.Q.value = 5;
+  const g = actx.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.6, t + 0.05); g.gain.linearRampToValueAtTime(0.35, t + 0.5); g.gain.exponentialRampToValueAtTime(0.001, t + 0.95);
+  const lfo = actx.createOscillator(); lfo.frequency.value = 26; const lg = actx.createGain(); lg.gain.value = 0.25; lfo.connect(lg).connect(g.gain);
+  o.connect(bp).connect(g).connect(master); o.start(t); o.stop(t + 1); lfo.start(t); lfo.stop(t + 1);
+}
+function sfxShutter() { noiseBurst(0.035, 3500, 'highpass', 0.6); noiseBurst(0.06, 2200, 'highpass', 0.4, 1, 0.07); tone(1800, 0.25, 0.05, 'square', 0.12); }
+function tone(freq, dur, vol, type = 'sine', delay = 0) {
+  if (!actx || vol <= 0.001) return;
+  const t = actx.currentTime + delay;
+  const o = actx.createOscillator(); o.type = type; o.frequency.value = freq;
+  const g = actx.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0005, t + dur);
+  o.connect(g).connect(master); o.start(t); o.stop(t + dur + 0.05);
+}
+function sfxJingle(vol) { for (let i = 0; i < 3; i++) { const f = rand(2600, 4300); tone(f, 0.3, vol, 'sine', i * 0.035 + rand(0, 0.03)); tone(f * 2.76, 0.12, vol * 0.3, 'sine', i * 0.035); } }
+function sfxChime() { [659, 784, 988, 1319].forEach((f, i) => tone(f, 1.2, 0.12, 'triangle', i * 0.12)); }
+function sfxWhoosh() { if (!actx) return; const t = actx.currentTime; const s = actx.createBufferSource(); s.buffer = noiseBuf; const f = actx.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 2; f.frequency.setValueAtTime(300, t); f.frequency.exponentialRampToValueAtTime(3000, t + 1.2); const g = actx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.4, t + 0.3); g.gain.exponentialRampToValueAtTime(0.0005, t + 1.4); s.connect(f).connect(g).connect(master); s.start(t); s.stop(t + 1.5); }
+function say(text, pitch = 0.5, rate = 0.85, volume = 1) {
+  try { const u = new SpeechSynthesisUtterance(text); u.pitch = pitch; u.rate = rate; u.volume = volume; speechSynthesis.cancel(); speechSynthesis.speak(u); } catch (e) { /* no speech */ }
+}
+
+// ---------------------------------------------------------------------------
+// Player & input
+// ---------------------------------------------------------------------------
+const player = { x: -5.0, z: -6.9, floor: LANDING_Y, eye: LANDING_Y + 1.6, vx: 0, vz: 0, stepAcc: 0, lastStep: -1, noise: 0, bob: 0, moving: 0 };
+let yaw = -2.45, pitch = -0.28;
+let film = 3;
+let game = 'intro'; // intro | playing | paused | ended
+let dragLook = false; // fallback when pointer lock isn't available
+const keys = {};
+
+window.addEventListener('keydown', (e) => {
+  keys[e.code] = true;
+  if (['Space', 'ArrowUp', 'ArrowDown'].includes(e.code)) e.preventDefault();
+  if (e.code === 'Space' && game === 'playing' && !e.repeat) takePhoto();
+});
+window.addEventListener('keyup', (e) => { keys[e.code] = false; });
+window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+
+let mouseDown = null;
+document.addEventListener('mousemove', (e) => {
+  const locked = document.pointerLockElement === renderer.domElement;
+  if (game !== 'playing') return;
+  if (!locked && !(dragLook && mouseDown)) return;
+  const dx = locked ? e.movementX : e.movementX * 1.4, dy = locked ? e.movementY : e.movementY * 1.4;
+  if (mouseDown) mouseDown.moved += Math.abs(dx) + Math.abs(dy);
+  yaw -= dx * 0.0022; pitch = clamp(pitch - dy * 0.0022, -1.35, 1.35);
+});
+renderer.domElement.addEventListener('mousedown', (e) => {
+  if (game !== 'playing') return;
+  if (document.pointerLockElement === renderer.domElement) { if (e.button === 0) takePhoto(); }
+  else if (dragLook) mouseDown = { moved: 0 };
+  else lockPointer();
+});
+window.addEventListener('mouseup', () => {
+  if (dragLook && mouseDown && mouseDown.moved < 6 && game === 'playing') takePhoto();
+  mouseDown = null;
+});
+function lockPointer() {
+  try {
+    const p = renderer.domElement.requestPointerLock();
+    if (p && p.catch) p.catch(() => { dragLook = true; });
+  } catch (e) { dragLook = true; }
+}
+document.addEventListener('pointerlockerror', () => { dragLook = true; toast('Drag with the mouse to look, click to take a photo', 4); });
+document.addEventListener('pointerlockchange', () => {
+  const locked = document.pointerLockElement === renderer.domElement;
+  if (!locked && game === 'playing' && !dragLook) setPaused(true);
+});
+window.addEventListener('keydown', (e) => { if (e.code === 'Escape' && game === 'playing' && dragLook) setPaused(true); });
+
+function setPaused(p) {
+  if (p) { game = 'paused'; $('pause').classList.remove('hidden'); }
+  else { $('pause').classList.add('hidden'); game = 'playing'; lockPointer(); }
+}
+
+function blocked(x, z) {
+  if (x < -7.7 || x > 7.7 || z < -7.7 || z > 7.7) return true;
+  const r = 0.28;
+  for (const [a, b, c, d] of blockers) if (x > a - r && x < b + r && z > c - r && z < d + r) return true;
+  if (Math.hypot(x - TREE.x, z - TREE.z) < TREE_R + r) return true;
+  return Math.abs(floorAt(x, z) - player.floor) > 0.3;
+}
+
+function updatePlayer(dt) {
+  const crouch = !!keys.KeyC;
+  const sprint = !!(keys.ShiftLeft || keys.ShiftRight) && !crouch;
+  const fwd = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0);
+  const str = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0);
+  const fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
+  let dx = fx * fwd + rx * str, dz = fz * fwd + rz * str;
+  const len = Math.hypot(dx, dz);
+  const speed = crouch ? 1.25 : sprint ? 4.3 : 2.4;
+  if (len > 0) { dx /= len; dz /= len; }
+  const k = 1 - Math.exp(-dt * 12);
+  player.vx = lerp(player.vx, dx * speed, k);
+  player.vz = lerp(player.vz, dz * speed, k);
+  const ox = player.x, oz = player.z;
+  const nx = player.x + player.vx * dt, nz = player.z + player.vz * dt;
+  if (!blocked(nx, player.z)) { player.x = nx; player.floor = floorAt(player.x, player.z); } else player.vx = 0;
+  if (!blocked(player.x, nz)) { player.z = nz; player.floor = floorAt(player.x, player.z); } else player.vz = 0;
+  const moved = Math.hypot(player.x - ox, player.z - oz);
+  player.moving = moved / dt;
+
+  // footsteps
+  const onStairs = stepIndexAt(player.x, player.z) >= 0 || player.floor > 0;
+  player.stepAcc += moved;
+  const stride = crouch ? 0.5 : sprint ? 1.0 : 0.72;
+  if (player.stepAcc > stride) {
+    player.stepAcc = 0;
+    const loud = crouch ? 0.6 : sprint ? 13 : 3.2;
+    const wood = onStairs;
+    sfxStep(crouch ? 0.02 : sprint ? 0.32 : 0.12, wood);
+    makeNoise(loud * (wood && !crouch ? 1.3 : 1), sprint ? 0.35 : 0);
+  }
+  player.bob += moved * (sprint ? 2.8 : 3.4);
+
+  // creaky steps
+  const si = stepIndexAt(player.x, player.z);
+  if (si !== player.lastStep) {
+    if (CREAKY.includes(si) && Math.abs(player.x + 7) < 0.42) {
+      sfxCreak();
+      makeNoise(48, 0.65);
+      toast('<b>CREEEAK!</b>', 1.6);
+    }
+    player.lastStep = si;
+  }
+
+  player.noise = Math.max(0, player.noise - dt * 35);
+  const targetEye = player.floor + (crouch ? 1.0 : 1.62) + Math.sin(player.bob) * (player.moving > 0.3 ? (sprint ? 0.06 : 0.035) : 0);
+  player.eye = lerp(player.eye, targetEye, 1 - Math.exp(-dt * 10));
+  player.crouch = crouch; player.sprint = sprint;
+}
+
+function makeNoise(amount, minHear) {
+  player.noise = clamp(player.noise + amount * 2.2, 0, 100);
+  const d = Math.hypot(S.pos.x - player.x, S.pos.z - player.z);
+  if (!santaPresent()) return;
+  const f = Math.max(clamp(1 - d / 15, 0, 1), minHear);
+  const add = amount * f;
+  if (add <= 0) return;
+  S.suspicion += add;
+  if (add > 7 && canReact()) startInvestigate(player.x, player.z, 2.6);
+}
+
+// ---------------------------------------------------------------------------
+// Santa behaviour
+// ---------------------------------------------------------------------------
+const santaPresent = () => ['arrive', 'walk', 'task', 'flee'].includes(S.state) || (S.state === 'chimney' && S.rise < 0.5);
+const canReact = () => ['walk', 'task', 'arrive'].includes(S.state);
+
+function startInvestigate(x, z, t) {
+  if (!S.invest) {
+    tone(220, 0.35, 0.05, 'triangle');
+    if (Math.random() < 0.5) say(['Hmm?', 'Hm? Who\'s there?', 'Hmmm…'][(Math.random() * 3) | 0], 0.4, 0.8, 0.6);
+  }
+  S.invest = { x, z, t };
+}
+
+function startTask(i) {
+  S.taskIdx = i;
+  S.task = TASKS[i];
+  S.path = S.task.path.map(([x, z]) => new THREE.Vector3(x, 0, z));
+  S.state = 'walk';
+  $('santaDoing').textContent = S.task.label;
+}
+
+function santaSpots() {
+  // forward vector of Santa's eyes
+  const h = S.heading + S.headYaw;
+  return new THREE.Vector3(Math.sin(h), 0, Math.cos(h));
+}
+
+const raycaster = new THREE.Raycaster();
+let losTimer = 0, losClear = false;
+function lineOfSight(from, to) {
+  const dir = to.clone().sub(from); const d = dir.length(); dir.normalize();
+  raycaster.set(from, dir); raycaster.far = d - 0.2;
+  return raycaster.intersectObjects(occluders, false).length === 0;
+}
+
+function updateSanta(dt) {
+  if (S.state === 'waiting' || S.state === 'gone' || S.state === 'caught') return;
+  let desired = S.heading, moveSpeed = 0;
+
+  if (S.state === 'arrive') {
+    S.timer -= dt;
+    S.pos.y = Math.max(0, S.pos.y - dt * 5);
+    if (S.timer <= 0) startTask(0);
+  }
+
+  // investigating pauses everything
+  if (S.invest && canReact()) {
+    S.invest.t -= dt;
+    desired = Math.atan2(S.invest.x - S.pos.x, S.invest.z - S.pos.z);
+    S.headYaw = lerp(S.headYaw, 0, 1 - Math.exp(-dt * 6));
+    if (S.invest.t <= 0) S.invest = null;
+  } else if (S.state === 'walk' || S.state === 'flee') {
+    const tgt = S.path[0];
+    const dx = tgt.x - S.pos.x, dz = tgt.z - S.pos.z, d = Math.hypot(dx, dz);
+    moveSpeed = S.state === 'flee' ? 4.2 : 1.15;
+    if (d < 0.08) {
+      S.path.shift();
+      if (!S.path.length) {
+        if (S.state === 'flee') { S.state = 'chimney'; S.rise = 0; S.timer = 0.5; }
+        else { S.state = 'task'; S.timer = S.task.dur; S.taskElapsed = 0; }
+      }
+      moveSpeed = 0;
+    } else {
+      desired = Math.atan2(dx, dz);
+      const step = Math.min(d, moveSpeed * dt * clamp(1 - Math.abs(angleDiff(S.heading, desired)) / 1.5, 0.15, 1));
+      S.pos.x += dx / d * step; S.pos.z += dz / d * step;
+      S.jingleAcc += step;
+      if (S.jingleAcc > 0.6) { S.jingleAcc = 0; const pd = Math.hypot(S.pos.x - player.x, S.pos.z - player.z); sfxJingle(0.05 * clamp(1.4 - pd / 14, 0.1, 1)); }
+    }
+    // glances while walking: head only
+    if (S.state === 'walk') S.headYaw = lerp(S.headYaw, S.glanceT > 0 ? clamp(S.glanceYaw, -1.1, 1.1) : 0, 1 - Math.exp(-dt * 4));
+    else S.headYaw = lerp(S.headYaw, 0, 1 - Math.exp(-dt * 6));
+  } else if (S.state === 'task') {
+    const [fx, fz] = S.task.face;
+    desired = Math.atan2(fx - S.pos.x, fz - S.pos.z);
+    if (S.glanceT > 0) desired += S.glanceYaw; // turns around to look
+    S.headYaw = lerp(S.headYaw, 0, 1 - Math.exp(-dt * 4));
+    if (S.glanceT <= 0) {
+      S.timer -= dt; S.taskElapsed += dt;
+      if (S.task.type === 'cookies') {
+        const n = Math.min(cookies.length, Math.floor(S.taskElapsed / 2));
+        while (S.cookiesEaten < n) { cookies[S.cookiesEaten].visible = false; S.cookiesEaten++; tone(140, 0.08, 0.04, 'triangle'); }
+        milk.scale.y = clamp(1 - S.taskElapsed / S.task.dur, 0.05, 1); milk.position.y = 0.5 + 0.065 * milk.scale.y;
+      }
+    }
+    if (S.timer <= 0) finishTask();
+  } else if (S.state === 'chimney') {
+    S.timer -= dt;
+    if (S.timer <= 0) {
+      if (S.rise === 0) { sfxWhoosh(); say('Ho ho ho! Merry Christmas!', 0.4, 0.85, 0.8); spawnSparkles(); }
+      S.rise += dt / 1.3;
+      S.pos.x = lerp(S.pos.x, 7.35, 1 - Math.exp(-dt * 4));
+      S.pos.y = S.rise * S.rise * 6;
+      S.heading += dt * 9;
+      if (S.rise >= 1) { S.state = 'gone'; santa.root.visible = false; setTimeout(() => lose(), 600); }
+    }
+    desired = S.heading;
+  }
+
+  // glance timer
+  if (canReact() && !S.invest) {
+    if (S.glanceT > 0) S.glanceT -= dt;
+    else if ((S.glanceTimer -= dt) <= 0) {
+      S.glanceTimer = rand(4.5, 8);
+      S.glanceT = rand(1.3, 2.0);
+      // Santa has a sixth sense: often glances toward you
+      const toPlayer = angleDiff(S.state === 'task' ? Math.atan2(S.task.face[0] - S.pos.x, S.task.face[1] - S.pos.z) : S.heading, Math.atan2(player.x - S.pos.x, player.z - S.pos.z));
+      S.glanceYaw = Math.random() < 0.55 ? toPlayer + rand(-0.4, 0.4) : rand(-2.4, 2.4);
+    }
+  }
+
+  if (S.state !== 'chimney') S.heading += clamp(angleDiff(S.heading, desired), -dt * 4.5, dt * 4.5);
+  S.speed = moveSpeed;
+
+  // --- vision ---
+  if (santaPresent() && S.state !== 'flee' && S.state !== 'chimney') {
+    const eye = new THREE.Vector3(S.pos.x, S.pos.y + 1.85, S.pos.z);
+    const pp = new THREE.Vector3(player.x, player.eye - 0.25, player.z);
+    const to = pp.clone().sub(eye); const d = to.length();
+    const flat = new THREE.Vector3(to.x, 0, to.z).normalize();
+    const cos = flat.dot(santaSpots());
+    losTimer -= dt;
+    if (losTimer <= 0) { losTimer = 0.1; losClear = lineOfSight(eye, pp); }
+    const inCone = cos > 0.35 && d < 13;
+    if (inCone && losClear) {
+      const f = Math.pow(clamp(1 - d / 13, 0, 1), 0.7);
+      const mv = player.moving < 0.2 ? 0.12 : player.sprint ? 1.8 : 1;
+      const rate = (75 * f * mv * (player.crouch ? 0.45 : 1)) + (d < 2.6 ? 50 : 0);
+      S.suspicion += rate * dt;
+      S.sawPlayerT = 0.3;
+      if (S.suspicion > 35 && canReact()) startInvestigate(player.x, player.z, 2.2);
+    } else {
+      S.sawPlayerT -= dt;
+      if (!S.invest) S.suspicion = Math.max(0, S.suspicion - dt * 6);
+    }
+    if (S.suspicion >= 100) flee();
+  }
+  S.suspicion = clamp(S.suspicion, 0, 100);
+
+  // bubble
+  if (S.state === 'flee' || (S.state === 'chimney' && S.rise === 0)) setBubble('!', '#d42a2f');
+  else if (S.state === 'chimney') setBubble('', '');
+  else if (S.invest || S.suspicion > 35) setBubble('?', S.suspicion > 65 ? '#e0602a' : '#c89a10');
+  else setBubble('', '');
+  santa.bubble.scale.setScalar(0.45 + S.suspicion / 250);
+}
+
+function finishTask() {
+  const t = S.task;
+  if (t.type === 'present') {
+    const away = new THREE.Vector3(S.pos.x - TREE.x, 0, S.pos.z - TREE.z).normalize();
+    const p = makePresent(TREE.x + away.x * 1.15 + rand(-0.2, 0.2), TREE.z + away.z * 1.15 + rand(-0.2, 0.2));
+    p.userData.grow = 0;
+    S.presentsLeft++;
+    santa.sack.scale.setScalar(1 - S.presentsLeft / (TOTAL_PRESENTS + 2));
+    tone(520, 0.2, 0.03, 'triangle');
+  } else if (t.type === 'stocking') {
+    const st = stockings[t.idx]; st.filled = true; st.stuff.visible = true; st.g.scale.set(1, 1, 1.25);
+  }
+  if (t.type === 'leave') { S.state = 'chimney'; S.rise = 0; S.timer = 0.6; S.fleeReason = 'finished'; $('santaDoing').textContent = 'Santa is going up the chimney!'; return; }
+  startTask(S.taskIdx + 1);
+}
+
+function flee() {
+  if (S.state === 'flee' || S.state === 'chimney') return;
+  S.state = 'flee'; S.invest = null; S.fleeReason = 'spotted';
+  S.path = [new THREE.Vector3(6.2, 0, S.pos.z > 0 ? 0.6 : -0.6), new THREE.Vector3(6.3, 0, 0)];
+  if (S.pos.x < 4 && S.pos.z > -2.2 && S.pos.z < 2.2 && S.pos.x > 0.5) S.path.unshift(new THREE.Vector3(S.pos.x, 0, S.pos.z < 0 ? -1.6 : 1.6));
+  say('Oh! Ho ho!', 0.5, 1.2, 1);
+  sfxJingle(0.15); sfxJingle(0.12);
+  $('santaDoing').textContent = 'Santa spotted you! He\'s making a run for it!';
+  warn('He saw you! Quick, take the picture!', 2.5);
+}
+
+// Pose & animate Santa's body
+function animateSanta(dt, time) {
+  const r = santa.root;
+  r.position.copy(S.pos);
+  r.rotation.y = S.heading;
+  santa.head.rotation.y = clamp(S.headYaw, -1.1, 1.1);
+  let legSwing = 0, armL = 0, armR = 0, lean = 0, bob = 0;
+  if (S.speed > 0) {
+    S.walkPhase += dt * S.speed * 5.5;
+    legSwing = Math.sin(S.walkPhase) * (S.state === 'flee' ? 0.8 : 0.45);
+    armL = -legSwing * 0.8; armR = legSwing * 0.8;
+    bob = Math.abs(Math.sin(S.walkPhase)) * 0.05;
+  } else {
+    bob = Math.sin(time * 2) * 0.01;
+  }
+  if (S.state === 'task' && S.glanceT <= 0 && !S.invest) {
+    const t = S.task.type;
+    if (t === 'present') { lean = 0.55; armL = armR = -1.0 + Math.sin(time * 3) * 0.1; }
+    else if (t === 'cookies') { const c = (Math.sin(time * 3.2) + 1) / 2; armR = -0.6 - c * 1.9; armL = -0.4; santa.head.rotation.x = c * 0.15; }
+    else if (t === 'stocking') { armL = armR = -1.4 + Math.sin(time * 8) * 0.15; }
+    else if (t === 'leave') { armR = -2.6; lean = -0.05; }
+  } else santa.head.rotation.x = 0;
+  if (S.state === 'chimney') { armR = -2.6; armL = 0.2; }
+  if (S.invest) { armL = armR = -0.25; lean = -0.08; }
+  const k = 1 - Math.exp(-dt * 8);
+  santa.legs[0].rotation.x = lerp(santa.legs[0].rotation.x, legSwing, k);
+  santa.legs[1].rotation.x = lerp(santa.legs[1].rotation.x, -legSwing, k);
+  santa.arms[0].rotation.x = lerp(santa.arms[0].rotation.x, armR, k); // right arm (-x side)
+  santa.arms[1].rotation.x = lerp(santa.arms[1].rotation.x, armL, k);
+  santa.arms[0].rotation.z = lerp(santa.arms[0].rotation.z, S.state === 'chimney' || (S.task && S.task.type === 'leave' && S.state === 'task') ? 0.5 : -0.18, k);
+  S.lean = lerp(S.lean, lean, k);
+  santa.upper.rotation.x = S.lean;
+  santa.upper.position.y = 0.85 + bob;
+}
+
+// Gold sparkles when Santa zooms up the chimney
+let sparkles = null;
+function spawnSparkles() {
+  const n = 160, g = new THREE.BufferGeometry(), p = new Float32Array(n * 3), v = [];
+  for (let i = 0; i < n; i++) { p[i * 3] = 7.0 + rand(-0.3, 0.3); p[i * 3 + 1] = rand(0.2, 2); p[i * 3 + 2] = rand(-0.5, 0.5); v.push([rand(-1.5, 0.5), rand(0.5, 3), rand(-1.5, 1.5)]); }
+  g.setAttribute('position', new THREE.BufferAttribute(p, 3));
+  sparkles = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffd860, size: 0.07, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+  sparkles.userData = { v, life: 2.2 };
+  scene.add(sparkles);
+}
+
+// ---------------------------------------------------------------------------
+// Camera / photo
+// ---------------------------------------------------------------------------
+function santaTarget() { return santa.chest.getWorldPosition(new THREE.Vector3()); }
+function photoCheck() {
+  if (!santa.root.visible || S.state === 'waiting' || (S.state === 'chimney' && S.rise > 0.45)) return { ok: false, why: 'Santa isn\'t in the shot!' };
+  const tgt = santaTarget();
+  const d = camera.position.distanceTo(tgt);
+  const ndc = tgt.clone().project(camera);
+  if (ndc.z > 1 || Math.abs(ndc.x) > 0.6 || Math.abs(ndc.y) > 0.75) return { ok: false, why: 'Missed! Santa wasn\'t in the frame.' };
+  if (d > 10) return { ok: false, why: 'Too far away — the photo is just a blurry red smudge.', d };
+  if (!lineOfSight(camera.position.clone(), tgt) && !lineOfSight(camera.position.clone(), santa.head.getWorldPosition(new THREE.Vector3()))) return { ok: false, why: 'Something was in the way!', d };
+  return { ok: true, d };
+}
+
+let flashT = 0;
+function takePhoto() {
+  if (game !== 'playing') return;
+  if (film <= 0) { toast('Out of film! Run and hug him?', 1.6); tone(200, 0.15, 0.06, 'square'); return; }
+  film--;
+  $('filmCount').textContent = '●'.repeat(film) + '○'.repeat(3 - film);
+  sfxShutter();
+  const res = photoCheck();
+  flashLight.intensity = 60;
+  camera.updateMatrixWorld();
+  renderer.render(scene, camera);
+  const img = renderer.domElement.toDataURL('image/jpeg', 0.85);
+  flashT = 0.35; $('flash').style.opacity = 0.9;
+  if (res.ok) { win(img, res.d, 'photo'); return; }
+  toast(res.why + (film ? '' : ' (No film left!)'), 2.2);
+  // a camera flash in the dark is hard to miss
+  if (santaPresent()) {
+    const d = Math.hypot(S.pos.x - player.x, S.pos.z - player.z);
+    S.suspicion += 55 * Math.max(clamp(1 - d / 16, 0, 1), 0.5);
+    if (canReact()) startInvestigate(player.x, player.z, 2.5);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// HUD helpers
+// ---------------------------------------------------------------------------
+let toastT = 0, warnT = 0;
+function toast(html, t = 2) { $('toast').innerHTML = html; $('toast').style.opacity = 1; toastT = t; }
+function warn(text, t = 1.5) { $('warn').textContent = text; $('warn').style.opacity = 1; warnT = t; }
+const hints = { seen: false, close: false };
+
+function updateHUD(dt) {
+  $('noiseFill').style.width = player.noise + '%';
+  $('susFill').style.width = S.suspicion + '%';
+  $('presentCount').textContent = S.presentsLeft;
+  if ((toastT -= dt) <= 0) $('toast').style.opacity = 0;
+  if ((warnT -= dt) <= 0) $('warn').style.opacity = 0;
+  if (S.invest && S.state !== 'flee' && warnT <= 0) { $('warn').textContent = 'Santa heard something… FREEZE!'; $('warn').style.opacity = 1; }
+  // viewfinder lights up when a good shot is possible
+  const res = santaPresent() ? photoCheck() : { ok: false };
+  $('viewfinder').classList.toggle('lock', !!res.ok);
+  if (!hints.seen && santaPresent() && S.state !== 'arrive') {
+    const ndc = santaTarget().project(camera);
+    if (ndc.z < 1 && Math.abs(ndc.x) < 1 && Math.abs(ndc.y) < 1) { hints.seen = true; toast('There he is! Get within range — the viewfinder turns <span style="color:#7dff8a">green</span> when the shot is good.', 4.5); }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Game flow
+// ---------------------------------------------------------------------------
+function startGame() {
+  initAudio();
+  if (actx && actx.state === 'suspended') actx.resume();
+  $('intro').classList.add('hidden');
+  $('hud').classList.remove('hidden');
+  game = 'playing';
+  lockPointer();
+  // Santa lands in the fireplace
+  S.state = 'arrive'; S.timer = 2.2; S.pos.set(7.2, 3, 0);
+  sfxJingle(0.06); setTimeout(() => sfxJingle(0.05), 300);
+  setTimeout(() => toast('<i>…jingle… jingle…</i> Someone\'s downstairs!', 3), 800);
+}
+$('startBtn').addEventListener('click', startGame);
+$('resumeBtn').addEventListener('click', () => setPaused(false));
+$('againBtn').addEventListener('click', () => location.reload());
+
+function endGame() {
+  game = 'ended';
+  if (document.pointerLockElement) document.exitPointerLock();
+  $('hud').classList.add('hidden');
+  $('end').classList.remove('hidden');
+}
+
+function win(img, d, how) {
+  const unaware = S.state !== 'flee' && S.state !== 'chimney' && S.suspicion < 40;
+  let stars = 1, caption;
+  if (how === 'hug') { stars = unaware ? 3 : 2; caption = 'Best. Hug. Ever.'; }
+  else if (S.state === 'flee' || S.state === 'chimney') { stars = 1; caption = 'Santa, mid-escape!'; }
+  else { stars = (unaware && d < 5.5) ? 3 : (d < 7.5 || unaware) ? 2 : 1; caption = unaware ? 'Caught red-handed!' : 'Santa looking surprised!'; }
+  S.state = 'caught';
+  sfxChime();
+  setTimeout(() => say('Ho ho ho! You caught me! Merry Christmas!', 0.45, 0.85, 1), 500);
+  $('endTitle').textContent = how === 'hug' ? 'You caught Santa! 🤗' : 'You caught Santa! 📸';
+  $('endPhoto').innerHTML = `<div class="polaroid"><img src="${img}" alt="Your photo of Santa"><div class="cap">${caption}</div></div>`;
+  $('endStars').textContent = '★'.repeat(stars) + '☆'.repeat(3 - stars);
+  const tips = stars === 3 ? 'A perfect sneak — he never knew you were there.' : stars === 2 ? 'Nice shot! For 3 stars, get close while he\'s busy and unaware.' : 'Got him! For more stars, get closer and stay unseen.';
+  $('endText').innerHTML = `${tips}<br>Presents under the tree: <b>${S.presentsLeft}</b> 🎁`;
+  endGame();
+}
+
+function lose() {
+  if (game === 'ended') return;
+  const spotted = S.fleeReason === 'spotted';
+  $('endTitle').textContent = 'Santa got away! 🎅💨';
+  $('endPhoto').innerHTML = '';
+  $('endStars').textContent = '☆☆☆';
+  $('endText').innerHTML = (spotted
+    ? 'He spotted you and zipped up the chimney with a wink.<br>Crouch, keep out of his sight, and freeze when he turns around.'
+    : 'He finished his rounds and vanished up the chimney before you could get a picture.<br>Move a little faster, but mind the creaky steps!')
+    + `<br><br>At least he left <b>${S.presentsLeft}</b> present${S.presentsLeft === 1 ? '' : 's'} under the tree 🎁 and the stockings are ${stockings.filter((s) => s.filled).length ? 'stuffed' : 'still empty'}.`;
+  endGame();
+}
+
+// ---------------------------------------------------------------------------
+// Main loop
+// ---------------------------------------------------------------------------
+let last = performance.now(), time = 0, crackleT = 0, timeScale = 1;
+function loop(now) {
+  const dt = Math.min(0.05, (now - last) / 1000) * timeScale; last = now; time += dt;
+
+  if (game === 'playing') {
+    updatePlayer(dt);
+    updateSanta(dt);
+    // hugging Santa counts too
+    if (santaPresent() && Math.hypot(S.pos.x - player.x, S.pos.z - player.z) < 0.95 && S.pos.y < 1) {
+      camera.position.set(player.x, player.eye, player.z); camera.rotation.set(pitch, yaw, 0);
+      renderer.render(scene, camera);
+      win(renderer.domElement.toDataURL('image/jpeg', 0.85), 0.9, 'hug');
+    }
+  }
+  if (game === 'playing' || game === 'intro' || game === 'ended') animateSanta(dt, time);
+  if (game === 'playing') updateHUD(dt);
+
+  // ambience
+  for (const f of flames) {
+    const s = f.userData.seed;
+    f.scale.set(1, 0.7 + Math.sin(time * 9 + s) * 0.2 + Math.sin(time * 23 + s * 2) * 0.1, 1);
+    f.position.y = f.userData.base + Math.sin(time * 7 + s) * 0.03;
+  }
+  fireLight.intensity = 20 + Math.sin(time * 11) * 2.5 + Math.sin(time * 27) * 1.5 + rand(-1, 1);
+  for (const b of bulbs) b.material.emissiveIntensity = 1.3 + Math.sin(time * 1.6 + b.userData.seed) * 1.0;
+  star.rotation.y += dt * 0.4;
+  pendulum.rotation.z = Math.sin(time * Math.PI) * 0.25;
+  const sp = snow.geometry.attributes.position;
+  for (let i = 0; i < SNOW_N; i++) {
+    let y = sp.getY(i) - dt * (0.4 + (i % 7) * 0.06);
+    if (y < 0) y = 8;
+    sp.setY(i, y); sp.setX(i, sp.getX(i) + Math.sin(time + i) * dt * 0.1);
+  }
+  sp.needsUpdate = true;
+  for (const p of presents) if (p.userData.grow !== undefined && p.userData.grow < 1) { p.userData.grow = Math.min(1, p.userData.grow + dt * 3); const g = p.userData.grow; p.scale.setScalar(g + Math.sin(g * Math.PI) * 0.25); }
+  if (sparkles) {
+    const pa = sparkles.geometry.attributes.position, v = sparkles.userData.v;
+    for (let i = 0; i < v.length; i++) { pa.setXYZ(i, pa.getX(i) + v[i][0] * dt, pa.getY(i) + v[i][1] * dt, pa.getZ(i) + v[i][2] * dt); v[i][1] -= dt * 1.2; }
+    pa.needsUpdate = true;
+    sparkles.userData.life -= dt; sparkles.material.opacity = clamp(sparkles.userData.life / 2.2, 0, 1);
+    if (sparkles.userData.life <= 0) { scene.remove(sparkles); sparkles = null; }
+  }
+  if (actx && game === 'playing') {
+    const fd = Math.hypot(7.5 - player.x, 0 - player.z) + Math.abs(player.floor) * 0.5;
+    const fv = clamp(1 - fd / 16, 0.03, 1);
+    fireGain.gain.value = 0.07 * fv;
+    if ((crackleT -= dt) <= 0) { crackleT = rand(0.05, 0.4); noiseBurst(rand(0.01, 0.04), rand(1500, 4500), 'bandpass', 0.25 * fv, 3); }
+  } else if (fireGain) fireGain.gain.value = 0;
+
+  if (flashT > 0) { flashT -= dt; flashLight.intensity = Math.max(0, flashT / 0.35) * 60; $('flash').style.opacity = Math.max(0, flashT / 0.35) * 0.9; }
+
+  camera.position.set(player.x, player.eye, player.z);
+  camera.rotation.set(pitch, yaw, 0);
+  renderer.render(scene, camera);
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+// Debug/testing hook
+window.__santa = { S, player, setView: (y, p) => { yaw = y; pitch = p; }, setTimeScale: (t) => { timeScale = t; }, startGame,
+  sim: (seconds, dt = 1 / 60) => { for (let t = 0; t < seconds && game === 'playing'; t += dt) { updatePlayer(dt); updateSanta(dt); animateSanta(dt, t); } } };
+</script>
+</body>
+</html>
