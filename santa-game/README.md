@@ -38,11 +38,22 @@ Touch controls switch on automatically when you start the game by tapping. It pl
 | Crouch / Run buttons | Tap to toggle |
 | ❚❚ button | Pause |
 
+## The house
+
+- **Your bedroom** (upstairs): you start here. Fairy lights, a letter to Santa, toys on the floor.
+- **The landing and stairs**: watch out for the creaky 4th and 9th steps.
+- **The living room**: the tree with a toy train going round it, the fireplace with stockings and
+  nutcrackers, cookies and milk, a bookshelf, a grandfather clock, and a cat asleep in the armchair.
+- **The kitchen and dining room** (through the archway): the table set for Christmas dinner, a
+  gingerbread house, and carrots on the counter for the reindeer.
+
 ## How it works
 
-- Santa works through a to-do list: presents under the tree, the cookies and milk, the stockings.
+- Santa works through a to-do list: presents under the tree, the cookies and milk, the reindeer's
+  carrots in the kitchen, the stockings.
   Then he heads back up the chimney. If he finishes before you get a photo, you lose.
 - **Suspicion meter:** Santa sees in a forward cone, and walls, the sofa and the tree block his view.
+  Walls also muffle the sound of your footsteps.
   Moving in his sight, running, missed camera flashes and footsteps all raise his suspicion.
   When he hears something he stops and turns to look, so freeze and crouch.
   If suspicion reaches 100 he runs for the chimney.
@@ -50,5 +61,5 @@ Touch controls switch on automatically when you start the game by tapping. It pl
 - **Scoring:** the viewfinder turns green when a shot will work. You get up to 3 stars for a close
   photo taken while Santa is unaware. Walking right up and hugging him also counts.
 
-All models are built from three.js primitives, all textures are drawn on canvases at runtime,
+All models are built from three.js primitives (static ones are merged so phones draw them fast), all textures are drawn on canvases at runtime,
 and all sounds are synthesized with the Web Audio API, so there are no asset files.
