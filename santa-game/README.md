@@ -13,7 +13,7 @@ cd santa-game
 python -m http.server 8000   # then open http://localhost:8000
 ```
 
-You can also open `index.html` directly in a modern desktop browser.
+You can also open `index.html` directly in a modern browser on a computer, phone or tablet.
 
 ## Controls
 
@@ -25,6 +25,18 @@ You can also open `index.html` directly in a modern desktop browser.
 | Hold Shift | Run (loud!) |
 | Click / Space | Take a photo (3 shots of film) |
 | Esc | Pause |
+
+### On a phone or tablet
+
+Touch controls switch on automatically when you start the game by tapping. It plays best in landscape.
+
+| Touch | Action |
+| --- | --- |
+| Drag on the left half | Walk (virtual joystick; push further to go faster) |
+| Drag on the right half | Look around |
+| 📷 button | Take a photo |
+| Crouch / Run buttons | Tap to toggle |
+| ❚❚ button | Pause |
 
 ## How it works
 

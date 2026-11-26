@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <title>Catch Santa!</title>
 <style>
   :root {
@@ -10,7 +12,28 @@
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; overflow: hidden; background: #05070d; font-family: Georgia, "Times New Roman", serif; color: var(--cream); }
-  canvas { display: block; }
+  canvas { display: block; touch-action: none; }
+  body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+  body.coarse .desk-only, body:not(.coarse) .touch-only { display: none !important; }
+
+  /* touch controls */
+  #touchUI { position: fixed; inset: 0; z-index: 6; }
+  #touchZone { position: absolute; inset: 0; touch-action: none; }
+  #stick { position: absolute; width: 120px; height: 120px; margin: -60px 0 0 -60px; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.35); background: rgba(255,255,255,0.08); pointer-events: none; opacity: 0.5; transition: opacity 0.15s; }
+  #stick.active { opacity: 1; }
+  #knob { position: absolute; left: 50%; top: 50%; width: 54px; height: 54px; margin: -27px 0 0 -27px; border-radius: 50%;
+    background: rgba(255,246,230,0.55); box-shadow: 0 2px 8px rgba(0,0,0,0.5); }
+  .tbtn { position: absolute; border-radius: 50%; border: 2px solid rgba(242,193,78,0.8); background: rgba(28,12,10,0.6);
+    color: var(--cream); font: bold 13px Georgia, serif; display: flex; align-items: center; justify-content: center; flex-direction: column;
+    touch-action: none; margin: 0; padding: 0; box-shadow: none; }
+  .tbtn.on { background: rgba(212,42,47,0.85); border-color: #fff; }
+  .tbtn:active { filter: brightness(1.3); }
+  #btnPhoto { width: 86px; height: 86px; right: calc(24px + env(safe-area-inset-right)); bottom: calc(28px + env(safe-area-inset-bottom)); font-size: 34px; background: rgba(212,42,47,0.75); }
+  #btnCrouch { width: 62px; height: 62px; right: calc(124px + env(safe-area-inset-right)); bottom: calc(24px + env(safe-area-inset-bottom)); }
+  #btnRun { width: 62px; height: 62px; right: calc(40px + env(safe-area-inset-right)); bottom: calc(128px + env(safe-area-inset-bottom)); }
+  #btnPause { width: 42px; height: 42px; left: 50%; margin-left: -21px; top: calc(10px + env(safe-area-inset-top)); font-size: 15px; }
+  .tbtn small { font-size: 18px; line-height: 1; }
   .overlay {
     position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
     background: radial-gradient(ellipse at center, rgba(10,14,30,0.55), rgba(0,0,0,0.85));
@@ -60,6 +83,34 @@
   .polaroid img { display: block; width: 100%; max-width: min(480px, 56vh); aspect-ratio: 4/3; object-fit: cover; filter: sepia(0.15) contrast(1.05); }
   .polaroid .cap { color: #333; font: italic 20px "Comic Sans MS", "Bradley Hand", cursive; margin-top: 10px; }
   .stars { font-size: 34px; color: var(--gold); letter-spacing: 6px; }
+
+  /* compact HUD for phones */
+  body.touch #objective { top: calc(10px + env(safe-area-inset-top)); left: calc(10px + env(safe-area-inset-left)); font-size: 12px; padding: 5px 8px; max-width: 34vw; }
+  body.touch #film { top: calc(10px + env(safe-area-inset-top)); right: calc(10px + env(safe-area-inset-right)); font-size: 13px; padding: 5px 8px; }
+  body.touch #meters { top: auto; bottom: auto; top: calc(62px + env(safe-area-inset-top)); left: calc(10px + env(safe-area-inset-left)); width: 150px; font-size: 11px; padding: 6px 8px; }
+  body.touch .bar { height: 7px; margin: 2px 0 5px; }
+  body.touch #status { bottom: auto; top: calc(48px + env(safe-area-inset-top)); right: calc(10px + env(safe-area-inset-right)); font-size: 11px; padding: 5px 8px; max-width: 40vw; }
+  body.touch #toast { bottom: auto; top: 62%; font-size: 15px; max-width: 60vw; }
+  body.touch #warn { font-size: 20px; top: 26%; width: 80vw; text-align: center; }
+  @media (max-width: 700px), (max-height: 520px) {
+    .card { padding: 16px 18px; }
+    h1 { font-size: 30px; }
+    .story { font-size: 14px; }
+    .controls { font-size: 13px; margin: 10px auto; }
+    button { font-size: 17px; padding: 10px 26px; margin-top: 10px; }
+    .stars { font-size: 26px; }
+  }
+  @media (orientation: landscape) { #rotateTip { display: none !important; } }
+  @media (max-height: 520px) {
+    h1 { font-size: 26px; margin: 0; }
+    .sub { margin-bottom: 6px; font-size: 13px; }
+    .story { font-size: 13px; line-height: 1.35; }
+    .story br { display: none; }
+    .controls { grid-template-columns: auto 1fr auto 1fr; max-width: 640px; gap: 3px 10px; font-size: 12px; margin: 8px auto; }
+    .controls b { font-size: 12px; }
+    .tip { font-size: 12px; margin-top: 6px; }
+    button { margin-top: 6px; }
+  }
 </style>
 <script type="importmap">
 { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
@@ -81,6 +132,14 @@
   <div id="toast"></div>
 </div>
 <div id="flash"></div>
+<div id="touchUI" class="hidden">
+  <div id="touchZone"></div>
+  <div id="stick"><div id="knob"></div></div>
+  <button class="tbtn" id="btnPhoto" aria-label="Take photo">📷</button>
+  <button class="tbtn" id="btnCrouch" aria-label="Crouch"><small>🧎</small>Crouch</button>
+  <button class="tbtn" id="btnRun" aria-label="Run"><small>🏃</small>Run</button>
+  <button class="tbtn" id="btnPause" aria-label="Pause">❚❚</button>
+</div>
 
 <div id="intro" class="overlay">
   <div class="card">
@@ -93,7 +152,16 @@
       If he hears or sees you, he'll be gone in a flash. Grandpa always said <b>the 4th and 9th steps creak in the middle</b>.
       Keep to the edges.
     </div>
-    <div class="controls">
+    <div class="controls touch-only">
+      <b>Left thumb</b><span>Drag anywhere on the left to walk</span>
+      <b>Right thumb</b><span>Drag on the right to look around</span>
+      <b>📷</b><span>Take a photo (3 shots of film)</span>
+      <b>Crouch</b><span>Tiptoe quietly (tap to toggle)</span>
+      <b>Run</b><span>Fast but loud! (tap to toggle)</span>
+      <b>❚❚</b><span>Pause</span>
+    </div>
+    <div class="tip touch-only" id="rotateTip" style="margin-top:0">Turn your phone sideways for the best view.</div>
+    <div class="controls desk-only">
       <b>Mouse</b><span>Look around</span>
       <b>W A S D</b><span>Move</span>
       <b>Hold C</b><span>Crouch & tiptoe (quiet)</span>
@@ -133,7 +201,9 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const angleDiff = (a, b) => { let d = b - a; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return d; };
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+const isCoarse = window.matchMedia('(pointer: coarse)').matches;
+if (isCoarse) document.body.classList.add('coarse');
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, isCoarse ? 1.5 : 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -145,8 +215,14 @@ scene.background = new THREE.Color(0x05070d);
 const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.05, 120);
 camera.rotation.order = 'YXZ';
 
-window.addEventListener('resize', () => {
+// keep a sensible horizontal field of view on tall (portrait) screens
+function fitCamera() {
   camera.aspect = window.innerWidth / window.innerHeight;
+  camera.fov = camera.aspect >= 1 ? 70 : clamp(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(36)) / camera.aspect) * 180 / Math.PI, 70, 100);
+}
+fitCamera();
+window.addEventListener('resize', () => {
+  fitCamera();
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
@@ -713,6 +789,9 @@ let yaw = -2.45, pitch = -0.28;
 let film = 3;
 let game = 'intro'; // intro | playing | paused | ended
 let dragLook = false; // fallback when pointer lock isn't available
+let touchMode = false; // on-screen controls for phones and tablets
+const touch = { crouch: false, run: false, mx: 0, my: 0, stickId: null, sx: 0, sy: 0, lookId: null, lx: 0, ly: 0 };
+const vibrate = (pattern) => { try { if (touchMode && navigator.vibrate) navigator.vibrate(pattern); } catch (e) { /* unsupported */ } };
 const keys = {};
 
 window.addEventListener('keydown', (e) => {
@@ -756,9 +835,73 @@ document.addEventListener('pointerlockchange', () => {
 window.addEventListener('keydown', (e) => { if (e.code === 'Escape' && game === 'playing' && dragLook) setPaused(true); });
 
 function setPaused(p) {
-  if (p) { game = 'paused'; $('pause').classList.remove('hidden'); }
-  else { $('pause').classList.add('hidden'); game = 'playing'; lockPointer(); }
+  if (p) { game = 'paused'; $('pause').classList.remove('hidden'); releaseTouches(); }
+  else { $('pause').classList.add('hidden'); game = 'playing'; if (!touchMode) lockPointer(); }
 }
+document.addEventListener('visibilitychange', () => { if (document.hidden && game === 'playing') setPaused(true); });
+
+// ---------------------------------------------------------------------------
+// Touch controls: left half = floating joystick, right half = look, plus buttons
+// ---------------------------------------------------------------------------
+const STICK_R = 55;
+const stickEl = $('stick'), knobEl = $('knob');
+function stickHome() {
+  stickEl.style.left = (Math.max(90, window.innerWidth * 0.12)) + 'px';
+  stickEl.style.top = (window.innerHeight - 100) + 'px';
+  knobEl.style.transform = '';
+  stickEl.classList.remove('active');
+}
+stickHome();
+window.addEventListener('resize', stickHome);
+function releaseTouches() { touch.stickId = touch.lookId = null; touch.mx = touch.my = 0; stickHome(); }
+const zone = $('touchZone');
+zone.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  if (game !== 'playing') return;
+  for (const t of e.changedTouches) {
+    if (t.clientX < window.innerWidth * 0.45 && touch.stickId === null) {
+      touch.stickId = t.identifier; touch.sx = t.clientX; touch.sy = t.clientY; touch.mx = touch.my = 0;
+      stickEl.style.left = t.clientX + 'px'; stickEl.style.top = t.clientY + 'px'; stickEl.classList.add('active');
+    } else if (touch.lookId === null) {
+      touch.lookId = t.identifier; touch.lx = t.clientX; touch.ly = t.clientY;
+    }
+  }
+}, { passive: false });
+zone.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  for (const t of e.changedTouches) {
+    if (t.identifier === touch.stickId) {
+      let dx = t.clientX - touch.sx, dy = t.clientY - touch.sy;
+      const len = Math.hypot(dx, dy);
+      if (len > STICK_R) { dx *= STICK_R / len; dy *= STICK_R / len; }
+      knobEl.style.transform = `translate(${dx}px, ${dy}px)`;
+      touch.mx = dx / STICK_R; touch.my = dy / STICK_R;
+    } else if (t.identifier === touch.lookId && game === 'playing') {
+      const sens = 0.0055 * (camera.fov / 70);
+      yaw -= (t.clientX - touch.lx) * sens;
+      pitch = clamp(pitch - (t.clientY - touch.ly) * sens, -1.35, 1.35);
+      touch.lx = t.clientX; touch.ly = t.clientY;
+    }
+  }
+}, { passive: false });
+function touchEnd(e) {
+  e.preventDefault();
+  for (const t of e.changedTouches) {
+    if (t.identifier === touch.stickId) { touch.stickId = null; touch.mx = touch.my = 0; stickHome(); }
+    if (t.identifier === touch.lookId) touch.lookId = null;
+  }
+}
+zone.addEventListener('touchend', touchEnd, { passive: false });
+zone.addEventListener('touchcancel', touchEnd, { passive: false });
+function tapButton(id, fn) {
+  $(id).addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); if (game === 'playing') fn(); }, { passive: false });
+  $(id).addEventListener('click', (e) => { e.preventDefault(); if (game === 'playing' && !touchMode) fn(); });
+}
+function syncToggles() { $('btnCrouch').classList.toggle('on', touch.crouch); $('btnRun').classList.toggle('on', touch.run); }
+tapButton('btnPhoto', () => takePhoto());
+tapButton('btnCrouch', () => { touch.crouch = !touch.crouch; if (touch.crouch) touch.run = false; syncToggles(); });
+tapButton('btnRun', () => { touch.run = !touch.run; if (touch.run) touch.crouch = false; syncToggles(); });
+tapButton('btnPause', () => setPaused(true));
 
 function blocked(x, z) {
   if (x < -7.7 || x > 7.7 || z < -7.7 || z > 7.7) return true;
@@ -769,15 +912,16 @@ function blocked(x, z) {
 }
 
 function updatePlayer(dt) {
-  const crouch = !!keys.KeyC;
-  const sprint = !!(keys.ShiftLeft || keys.ShiftRight) && !crouch;
-  const fwd = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0);
-  const str = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0);
+  const crouch = !!keys.KeyC || touch.crouch;
+  const sprint = (!!(keys.ShiftLeft || keys.ShiftRight) || touch.run) && !crouch;
+  let fwd = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0);
+  let str = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0);
+  if (Math.hypot(touch.mx, touch.my) > 0.15) { fwd -= touch.my; str += touch.mx; } // analog stick: push further to go faster
   const fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
   let dx = fx * fwd + rx * str, dz = fz * fwd + rz * str;
   const len = Math.hypot(dx, dz);
   const speed = crouch ? 1.25 : sprint ? 4.3 : 2.4;
-  if (len > 0) { dx /= len; dz /= len; }
+  if (len > 1) { dx /= len; dz /= len; }
   const k = 1 - Math.exp(-dt * 12);
   player.vx = lerp(player.vx, dx * speed, k);
   player.vz = lerp(player.vz, dz * speed, k);
@@ -807,6 +951,7 @@ function updatePlayer(dt) {
     if (CREAKY.includes(si) && Math.abs(player.x + 7) < 0.42) {
       sfxCreak();
       makeNoise(48, 0.65);
+      vibrate([60, 40, 90]);
       toast('<b>CREEEAK!</b>', 1.6);
     }
     player.lastStep = si;
@@ -1002,6 +1147,7 @@ function flee() {
   sfxJingle(0.15); sfxJingle(0.12);
   $('santaDoing').textContent = 'Santa spotted you! He\'s making a run for it!';
   warn('He saw you! Quick, take the picture!', 2.5);
+  vibrate(250);
 }
 
 // Pose & animate Santa's body
@@ -1072,6 +1218,7 @@ function takePhoto() {
   film--;
   $('filmCount').textContent = '●'.repeat(film) + '○'.repeat(3 - film);
   sfxShutter();
+  vibrate(35);
   const res = photoCheck();
   flashLight.intensity = 60;
   camera.updateMatrixWorld();
@@ -1115,19 +1262,31 @@ function updateHUD(dt) {
 // ---------------------------------------------------------------------------
 // Game flow
 // ---------------------------------------------------------------------------
-function startGame() {
+function startGame(e) {
   initAudio();
   if (actx && actx.state === 'suspended') actx.resume();
   $('intro').classList.add('hidden');
   $('hud').classList.remove('hidden');
   game = 'playing';
-  lockPointer();
+  touchMode = e && e.pointerType ? (e.pointerType === 'touch' || e.pointerType === 'pen') : isCoarse;
+  if (touchMode) {
+    document.body.classList.add('touch');
+    $('touchUI').classList.remove('hidden');
+    $('viewfinder').style.width = '40vmin'; $('viewfinder').style.height = '30vmin';
+    stickHome();
+    try {
+      const fs = document.documentElement.requestFullscreen && document.documentElement.requestFullscreen({ navigationUI: 'hide' });
+      if (fs && fs.then) fs.then(() => { try { screen.orientation.lock('landscape').catch(() => {}); } catch (err) { /* not supported */ } }).catch(() => {});
+    } catch (err) { /* fullscreen not allowed here */ }
+    if (window.innerHeight > window.innerWidth) setTimeout(() => toast('Tip: turn your phone sideways for a wider view', 3), 4200);
+  } else lockPointer();
   // Santa lands in the fireplace
   S.state = 'arrive'; S.timer = 2.2; S.pos.set(7.2, 3, 0);
   sfxJingle(0.06); setTimeout(() => sfxJingle(0.05), 300);
   setTimeout(() => toast('<i>…jingle… jingle…</i> Someone\'s downstairs!', 3), 800);
 }
 $('startBtn').addEventListener('click', startGame);
+if (isCoarse) $('startBtn').textContent = 'Tap to tiptoe downstairs';
 $('resumeBtn').addEventListener('click', () => setPaused(false));
 $('againBtn').addEventListener('click', () => location.reload());
 
@@ -1135,6 +1294,8 @@ function endGame() {
   game = 'ended';
   if (document.pointerLockElement) document.exitPointerLock();
   $('hud').classList.add('hidden');
+  $('touchUI').classList.add('hidden');
+  releaseTouches();
   $('end').classList.remove('hidden');
 }
 
@@ -1230,7 +1391,7 @@ function loop(now) {
 requestAnimationFrame(loop);
 
 // Debug/testing hook
-window.__santa = { S, player, setView: (y, p) => { yaw = y; pitch = p; }, setTimeScale: (t) => { timeScale = t; }, startGame,
+window.__santa = { S, player, touch, setView: (y, p) => { yaw = y; pitch = p; }, setTimeScale: (t) => { timeScale = t; }, startGame,
   sim: (seconds, dt = 1 / 60) => { for (let t = 0; t < seconds && game === 'playing'; t += dt) { updatePlayer(dt); updateSanta(dt); animateSanta(dt, t); } } };
 </script>
 </body>
