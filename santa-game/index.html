@@ -49,6 +49,10 @@
   /* the text scrolls if space is tight; the button underneath is always visible */
   .card-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
   .card-foot { flex: none; }
+  .diff { margin-top: 12px; font-size: 15px; }
+  .dbtn { margin: 0 3px; padding: 5px 14px; font-size: 14px; border-radius: 20px; background: transparent; box-shadow: none; border: 2px solid var(--gold); color: var(--cream); }
+  .dbtn.sel { background: var(--red); }
+  #diffDesc { margin-top: 6px; min-height: 1.2em; }
   .card-foot button { margin-top: 10px; }
   h1 { margin: 0 0 6px; font-size: 44px; color: var(--gold); letter-spacing: 1px; text-shadow: 0 2px 0 #7a1010; }
   h2 { margin: 0 0 10px; color: var(--gold); }
@@ -164,7 +168,8 @@
     <div class="story">
       You wake up in your bedroom to a faint <i>jingle</i> and the crackle of a fire. Someone is downstairs.
       Grab your camera, creep down the stairs, and get a photo of <b>Santa Claus</b> before he goes back up the chimney.
-      He might wander into the kitchen, too. The reindeer's carrots are on the counter.
+      He wanders all over the house: the tree, the study, the kitchen, the stockings.
+      <br><br>Your parents are asleep down the hall. Don't wake them! Dad keeps a spare roll of film in his camera bag.
       <br><br>
       If he hears or sees you, he'll be gone in a flash. Grandpa always said <b>the 4th and 9th steps creak in the middle</b>.
       Keep to the edges.
@@ -186,6 +191,10 @@
       <b>Click / Space</b><span>Take a photo (3 shots of film)</span>
       <b>Esc</b><span>Pause</span>
     </div>
+    <div class="diff">Difficulty:
+      <button class="dbtn" data-d="easy">Easy</button><button class="dbtn" data-d="normal">Normal</button><button class="dbtn" data-d="hard">Hard</button>
+    </div>
+    <div class="tip" id="diffDesc"></div>
     <div class="tip">Tip: when Santa turns around, freeze and crouch. Shots from close range score higher.</div>
     </div>
     <div class="card-foot"><button id="startBtn">Tiptoe downstairs</button></div>
@@ -396,7 +405,12 @@ function tiled(tex, w, h, tile = 2, extra = {}) {
   if (!tiledCache.has(key)) {
     const t = tex.clone(); t.needsUpdate = true;
     t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(Math.max(0.05, w / tile), Math.max(0.05, h / tile));
-    tiledCache.set(key, new THREE.MeshStandardMaterial({ map: t, roughness: 0.9, ...extra }));
+    const m = new THREE.MeshStandardMaterial({ map: t, roughness: 0.9, ...extra });
+    // when static meshes are merged, the repeat is baked into the UVs and all sizes share one material
+    const baseKey = tex.uuid + JSON.stringify(extra);
+    if (!tiledCache.has(baseKey)) { const bt = tex.clone(); bt.needsUpdate = true; bt.wrapS = bt.wrapT = THREE.RepeatWrapping; bt.repeat.set(1, 1); tiledCache.set(baseKey, new THREE.MeshStandardMaterial({ map: bt, roughness: 0.9, ...extra })); }
+    m.userData.tiledBase = tiledCache.get(baseKey);
+    tiledCache.set(key, m);
   }
   return tiledCache.get(key);
 }
@@ -444,7 +458,9 @@ function makeSnow(x0, x1, y0, y1, z0, z1, n) {
 function wbox(axis, c, out, wAlong, h, thick, a, y, n, mat) {
   return axis === 'z' ? box(wAlong, h, thick, mat, a, y, c + out * n) : box(thick, h, wAlong, mat, c + out * n, y, a);
 }
-function addWindow(axis, c, out, a0, a1, y0, y1, { curtains = 0x1d4a2e } = {}) {
+let windowCount = 0;
+function addWindow(axis, c, out, a0, a1, y0, y1, { curtains = 0x1d4a2e, minY = 0 } = {}) {
+  const back = 4.2 + (windowCount++) * 0.07;
   const am = (a0 + a1) / 2, ym = (y0 + y1) / 2, wA = a1 - a0, h = y1 - y0;
   wbox(axis, c, out, wA + 0.2, 0.12, 0.3, am, y0, -0.1, frameMat);
   wbox(axis, c, out, wA + 0.2, 0.12, 0.3, am, y1, -0.1, frameMat);
@@ -466,15 +482,15 @@ function addWindow(axis, c, out, a0, a1, y0, y1, { curtains = 0x1d4a2e } = {}) {
     wbox(axis, c, out, wA + 0.3, 0.25, 0.1, am, y1 + 0.12, -0.2, std(0xb03030, { roughness: 1 })); // valance
   }
   // the view outside
-  const sky = addMesh(new THREE.PlaneGeometry(wA * 6, 10), skyMat, ...at(am, ym + 1, 4.2));
+  const sky = addMesh(new THREE.PlaneGeometry(wA * 5, 10), skyMat, ...at(am, ym + 1, back));
   sky.rotation.y = rotY;
-  const gw = axis === 'z' ? wA * 6 : 4, gd = axis === 'z' ? 4 : wA * 6;
+  const gw = axis === 'z' ? wA * 5 : 4, gd = axis === 'z' ? 4 : wA * 5;
   const ground = addMesh(new THREE.PlaneGeometry(gw, gd), snowGroundMat, ...at(am, -0.05, 2.2));
   ground.rotation.x = -Math.PI / 2;
   const n0 = c + out * 0.3, n1 = c + out * 3.8;
   const [s0, s1] = [Math.min(n0, n1), Math.max(n0, n1)];
-  if (axis === 'z') makeSnow(a0 - 1.5, a1 + 1.5, Math.max(0, y0 - 2), y1 + 2.5, s0, s1, 240);
-  else makeSnow(s0, s1, Math.max(0, y0 - 2), y1 + 2.5, a0 - 1.5, a1 + 1.5, 240);
+  if (axis === 'z') makeSnow(a0 - 1.5, a1 + 1.5, Math.max(minY, y0 - 2), y1 + 2.5, s0, s1, 240);
+  else makeSnow(s0, s1, Math.max(minY, y0 - 2), y1 + 2.5, a0 - 1.5, a1 + 1.5, 240);
 }
 
 // Instanced books and fairy lights (cheap to draw)
@@ -486,6 +502,15 @@ function shelfBooks(x0, x1, y, z, depth) {
     const w = rand(0.035, 0.09), h = rand(0.2, 0.33);
     bookItems.push({ x: x + w / 2, y: y + h / 2, z, w, h, d: depth * rand(0.75, 0.95), color: new THREE.Color().setHSL(rand(0, 1), rand(0.3, 0.6), rand(0.2, 0.45)) });
     x += w + 0.004;
+  }
+}
+function shelfBooksZ(z0, z1, y, x, depth) {
+  let z = z0;
+  while (z < z1 - 0.06) {
+    if (Math.random() < 0.07) { z += rand(0.1, 0.25); continue; }
+    const w = rand(0.035, 0.09), h = rand(0.2, 0.33);
+    bookItems.push({ x, y: y + h / 2, z: z + w / 2, w: depth * rand(0.75, 0.95), h, d: w, color: new THREE.Color().setHSL(rand(0, 1), rand(0.3, 0.6), rand(0.2, 0.45)) });
+    z += w + 0.004;
   }
 }
 const fairyItems = [];
@@ -500,12 +525,12 @@ function fairyLights(x0, z0, x1, z1, y, n, sag = 0.18) {
 // ===================== LIVING ROOM =====================
 floorPlane(-8, 8, -8, 8, 0, floorTex, 4);
 ceilPlane(-8, 8, -8, 8, 6, 0xcfc6b8);
-wall('z', -8.1, -8.2, 8.2, 0, 6, [{ a0: -6.2, a1: -5.0, y0: 3, y1: 5.2 }], wallTex);     // back (bedroom door)
+wall('z', -8.1, -8.2, 8.2, 0, 6, [{ a0: -6.2, a1: -5.0, y0: 3, y1: 5.2 }, { a0: 2.1, a1: 3.3, y0: 0, y1: 2.3 }], wallTex); // back (bedroom & study doors)
 wall('z', 8.1, -8.2, 8.2, 0, 6, [{ a0: -1, a1: 3, y0: 1.2, y1: 4.2 }], wallTex);         // front (window)
-wall('x', -8.1, -8.2, 8.2, 0, 6, [{ a0: 4, a1: 7.5, y0: 0, y1: 2.8 }], wallTex);         // left (archway to kitchen)
+wall('x', -8.1, -8.2, 8.2, 0, 6, [{ a0: 4, a1: 7.5, y0: 0, y1: 2.8 }, { a0: -7.2, a1: -5.9, y0: 3, y1: 5.2 }], wallTex); // left (kitchen archway, upstairs hallway)
 wall('x', 8.1, -8.2, 8.2, 0, 6, [{ a0: 3.5, a1: 6.5, y0: 1.2, y1: 4.2 }], wallTex);      // right (window)
 // baseboards & crown moulding
-box(16, 0.18, 0.05, trimMat, 0, 0.09, -7.98); box(16, 0.18, 0.05, trimMat, 0, 0.09, 7.98);
+box(10.1, 0.18, 0.05, trimMat, -2.95, 0.09, -7.98); box(4.7, 0.18, 0.05, trimMat, 5.65, 0.09, -7.98); box(16, 0.18, 0.05, trimMat, 0, 0.09, 7.98);
 box(0.05, 0.18, 16, trimMat, 7.98, 0.09, 0);
 box(0.05, 0.18, 12, trimMat, -7.98, 0.09, -2); box(0.05, 0.18, 0.5, trimMat, -7.98, 0.09, 7.75);
 box(16, 0.2, 0.08, trimMat, 0, 5.9, -7.96); box(16, 0.2, 0.08, trimMat, 0, 5.9, 7.96);
@@ -539,9 +564,6 @@ const door = new THREE.Group(); door.position.set(-6.15, LANDING_Y, -8.3); door.
 addMesh(new THREE.BoxGeometry(1.15, 2.18, 0.05), std(0xe6dccb, { roughness: 0.6 }), 0.58, 1.09, 0, { parent: door });
 addMesh(new THREE.SphereGeometry(0.045, 10, 10), std(0xd4a640, { metalness: 0.8, roughness: 0.3 }), 1.02, 1.0, 0.05, { parent: door });
 addMesh(new THREE.BoxGeometry(0.3, 0.4, 0.01), std(0xf2c14e), 0.58, 1.6, 0.03, { parent: door }); // "Do not disturb (except Santa)" sign
-// a picture on the landing wall
-box(0.04, 0.6, 0.8, std(0xb08a3a, { metalness: 0.4 }), -7.97, LANDING_Y + 1.6, -6.6);
-box(0.045, 0.5, 0.7, std(0x6a8aa0), -7.96, LANDING_Y + 1.6, -6.6);
 
 // railing helper: posts + rail between two points
 const railMat = std(0xefe7d6, { roughness: 0.5 });
@@ -921,13 +943,13 @@ box(0.06, 0.3, 0.14, std(0x1f6a38, { roughness: 1 }), -7.52, BY + 0.5, -11.25);
 // ===================== KITCHEN & DINING ROOM =====================
 const KX = -8.2;
 floorPlane(-17, KX, -1, 8, 0.001, kitFloorTex, 1.2);
-ceilPlane(-17, KX, -1, 8, 3.2, 0xe8e2d0);
-wall('x', -17.1, -1.2, 8.2, 0, 3.2, [{ a0: 1.2, a1: 2.8, y0: 1.45, y1: 2.5 }], kitWallTex);
-wall('z', -1.1, -17.2, KX, 0, 3.2, [], kitWallTex);
-wall('z', 8.1, -17.2, KX, 0, 3.2, [{ a0: -13, a1: -10.5, y0: 1.2, y1: 2.5 }], kitWallTex);
-wall('x', -8.23, -1, 8, 0, 3.2, [{ a0: 4, a1: 7.5, y0: 0, y1: 2.8 }], kitWallTex, { t: 0.02 });
+ceilPlane(-17, KX, -1, 8, 3.0, 0xe8e2d0);
+wall('x', -17.1, -1.2, 8.2, 0, 3.0, [{ a0: 1.2, a1: 2.8, y0: 1.45, y1: 2.5 }], kitWallTex);
+wall('z', -1.1, -17.2, KX, 0, 3.0, [], kitWallTex);
+wall('z', 8.1, -17.2, KX, 0, 3.0, [{ a0: -13, a1: -10.5, y0: 1.2, y1: 2.5 }], kitWallTex);
+wall('x', -8.23, -1, 8, 0, 3.0, [{ a0: 4, a1: 7.5, y0: 0, y1: 2.8 }], kitWallTex, { t: 0.02 });
 box(8.8, 0.15, 0.04, trimMat, -12.6, 0.075, -0.98); box(8.8, 0.15, 0.04, trimMat, -12.6, 0.075, 7.98);
-box(8.8, 0.12, 0.06, trimMat, -12.6, 3.14, -0.97); box(8.8, 0.12, 0.06, trimMat, -12.6, 3.14, 7.97);
+box(8.8, 0.12, 0.06, trimMat, -12.6, 2.94, -0.97); box(8.8, 0.12, 0.06, trimMat, -12.6, 2.94, 7.97);
 addWindow('x', -17.1, -1, 1.2, 2.8, 1.45, 2.5, { curtains: null });
 addWindow('z', 8.1, 1, -13, -10.5, 1.2, 2.5, { curtains: null });
 const cabMat = std(0xd9cfb8, { roughness: 0.6 }), counterMat = std(0x3a3a3e, { roughness: 0.35 }), knobMat = std(0xc8a040, { metalness: 0.8, roughness: 0.3 });
@@ -944,7 +966,7 @@ box(3.3, 0.47, 0.02, tiled(tileTex, 3.3, 0.47, 0.6), -14.65, 1.165, -0.99);
 for (const [zc, len] of [[0.2, 1.6], [3.3, 0.6], [5.1, 0.6]]) { box(0.4, 0.8, len, cabMat, -16.8, 2.3, zc); box(0.02, 0.7, len - 0.08, std(0xcdc2a8, { roughness: 0.6 }), -16.59, 2.3, zc); }
 box(3.3, 0.8, 0.4, cabMat, -14.65, 2.3, -0.8);
 box(0.55, 0.25, 0.9, std(0xb8b8bc, { metalness: 0.6, roughness: 0.4 }), -16.72, 1.95, 4.2);
-box(0.3, 1.0, 0.4, std(0xb8b8bc, { metalness: 0.6, roughness: 0.4 }), -16.85, 2.6, 4.2);
+box(0.3, 0.8, 0.4, std(0xb8b8bc, { metalness: 0.6, roughness: 0.4 }), -16.85, 2.5, 4.2);
 box(0.3, 0.01, 0.6, new THREE.MeshBasicMaterial({ color: 0xffe2a8 }), -16.7, 1.82, 4.2);
 const hoodLight = new THREE.PointLight(0xffd9a0, 2.6, 7, 1.8);
 hoodLight.position.set(-16.4, 1.7, 4.2); scene.add(hoodLight);
@@ -1005,8 +1027,8 @@ box(1.3, 0.06, 2.5, darkWood, TX, 0.76, TZ);
 for (const [dx, dz] of [[-0.55, -1.1], [0.55, -1.1], [-0.55, 1.1], [0.55, 1.1]]) box(0.07, 0.73, 0.07, darkWood, TX + dx, 0.37, TZ + dz);
 box(1.36, 0.01, 2.56, std(0xb01a20, { roughness: 1 }), TX, 0.795, TZ);
 box(0.4, 0.012, 2.6, std(0xf2c14e, { roughness: 0.8 }), TX, 0.802, TZ);
-function chair(x, z, rot) {
-  const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = rot; scene.add(g);
+function chair(x, z, rot, y = 0) {
+  const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = rot; scene.add(g);
   addMesh(new THREE.BoxGeometry(0.45, 0.05, 0.45), darkWood, 0, 0.46, 0, { parent: g });
   for (const [dx, dz] of [[-0.19, -0.19], [0.19, -0.19], [-0.19, 0.19], [0.19, 0.19]]) addMesh(new THREE.BoxGeometry(0.04, 0.45, 0.04), darkWood, dx, 0.22, dz, { parent: g });
   addMesh(new THREE.BoxGeometry(0.45, 0.55, 0.04), darkWood, 0, 0.75, -0.21, { parent: g });
@@ -1032,7 +1054,7 @@ for (const dz of [-0.7, 0, 0.7]) for (const s of [-1, 1]) {
   }
 }
 // pendant lamp over the table (off)
-addMesh(new THREE.CylinderGeometry(0.01, 0.01, 0.9), std(0x222222), TX, 2.75, TZ);
+addMesh(new THREE.CylinderGeometry(0.01, 0.01, 0.7), std(0x222222), TX, 2.65, TZ);
 addMesh(new THREE.ConeGeometry(0.3, 0.25, 20, 1, true), std(0x1f4a33, { side: THREE.DoubleSide }), TX, 2.2, TZ);
 // calendar on the wall
 const calTex = textTex(200, 260, (g) => {
@@ -1044,7 +1066,201 @@ const calTex = textTex(200, 260, (g) => {
 });
 const cal = addMesh(new THREE.PlaneGeometry(0.4, 0.52), new THREE.MeshStandardMaterial({ map: calTex }), -8.26, 1.7, 1.5); cal.rotation.y = -Math.PI / 2;
 // wall clock above the archway
-const kclock = addMesh(new THREE.CylinderGeometry(0.2, 0.2, 0.04, 24), std(0xf3ead2), -8.27, 2.95, 1.5); kclock.rotation.z = Math.PI / 2;
+const kclock = addMesh(new THREE.CylinderGeometry(0.2, 0.2, 0.04, 24), std(0xf3ead2), -8.27, 2.6, 1.5); kclock.rotation.z = Math.PI / 2;
+
+// ===================== MORE ROOMS =====================
+const UY = LANDING_Y;
+const hallTex = canvasTex(256, 256, (g, w, h) => {
+  g.fillStyle = '#2f4a3c'; g.fillRect(0, 0, w, h);
+  g.fillStyle = 'rgba(230,210,150,0.18)';
+  for (let y = 0; y < h; y += 64) for (let x = 0; x < w; x += 64) { const ox = (y / 64) % 2 ? 32 : 0; g.beginPath(); g.ellipse(x + ox + 16, y + 32, 8, 14, 0, 0, Math.PI * 2); g.fill(); }
+});
+const studyTex = canvasTex(256, 256, (g, w, h) => {
+  g.fillStyle = '#3a2a1c'; g.fillRect(0, 0, w, h);
+  for (let x = 0; x < w; x += 64) { g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillRect(x, 0, 3, h); g.fillStyle = 'rgba(255,220,160,0.06)'; g.fillRect(x + 8, 8, 48, h - 16); }
+});
+const parentsTex = canvasTex(256, 256, (g, w, h) => {
+  g.fillStyle = '#cdb9a0'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 18; i++) {
+    const x = rand(0, w), y = rand(0, h);
+    g.fillStyle = 'rgba(150,60,70,0.35)';
+    for (let k = 0; k < 5; k++) { const a = k / 5 * Math.PI * 2; g.beginPath(); g.arc(x + Math.cos(a) * 5, y + Math.sin(a) * 5, 4, 0, Math.PI * 2); g.fill(); }
+    g.fillStyle = 'rgba(240,200,90,0.6)'; g.beginPath(); g.arc(x, y, 3, 0, Math.PI * 2); g.fill();
+  }
+});
+const beigeCarpetTex = canvasTex(256, 256, (g, w, h) => {
+  g.fillStyle = '#a89478'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 4000; i++) { g.fillStyle = `rgba(${Math.random() < 0.5 ? '255,255,255' : '0,0,0'},0.05)`; g.fillRect(rand(0, w), rand(0, h), 2, 2); }
+});
+// trim around a wall opening (both faces) plus a threshold
+function doorTrim(axis, c, a0, a1, y0, h) {
+  for (const n of [-0.13, 0.13]) {
+    wbox(axis, c, 1, 0.1, h + 0.1, 0.06, a0 - 0.05, y0 + h / 2, n, trimMat);
+    wbox(axis, c, 1, 0.1, h + 0.1, 0.06, a1 + 0.05, y0 + h / 2, n, trimMat);
+    wbox(axis, c, 1, a1 - a0 + 0.3, 0.1, 0.06, (a0 + a1) / 2, y0 + h + 0.05, n, trimMat);
+  }
+  wbox(axis, c, 1, a1 - a0, 0.03, 0.3, (a0 + a1) / 2, y0 + 0.015, 0, lightWood);
+}
+function doorSlab(x, y, z, rot) {
+  const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = rot; scene.add(g);
+  addMesh(new THREE.BoxGeometry(1.15, 2.18, 0.05), std(0xe6dccb, { roughness: 0.6 }), 0.58, 1.09, 0, { parent: g });
+  addMesh(new THREE.SphereGeometry(0.045, 10, 10), std(0xd4a640, { metalness: 0.8, roughness: 0.3 }), 1.02, 1.0, 0.05, { parent: g });
+}
+
+// --- Upstairs hallway (off the landing) ---
+doorTrim('x', -8.1, -7.2, -5.9, UY, 2.2);
+floorPlane(-14, -8.2, -8, -5, UY + 0.002, floorTex, 4);
+ceilPlane(-14, -8.2, -8, -5, 6, 0xcfc6b8);
+wall('z', -8.1, -14.2, -8.2, UY, 6, [{ a0: -12.2, a1: -11.0, y0: UY, y1: UY + 2.2 }], hallTex);
+wall('z', -4.9, -17.2, -8.2, UY, 6, [{ a0: -11.6, a1: -10.4, y0: UY, y1: UY + 2.2 }], hallTex);
+wall('x', -14.1, -8.2, -4.8, UY, 6, [], hallTex);
+wall('x', -8.23, -8, -5, UY, 6, [{ a0: -7.2, a1: -5.9, y0: UY, y1: UY + 2.2 }], hallTex, { t: 0.02 });
+box(5.2, 0.01, 0.9, std(0x7a1820), -11.1, UY + 0.006, -6.5);
+box(0.4, 0.8, 1.2, darkWood, -13.75, UY + 0.4, -6.5);
+addMesh(new THREE.CylinderGeometry(0.08, 0.06, 0.25, 12), std(0x2a5ad4, { roughness: 0.3 }), -13.75, UY + 0.93, -6.3);
+for (let i = 0; i < 5; i++) addMesh(new THREE.SphereGeometry(0.05, 8, 8), std(0xc41e24), -13.75 + rand(-0.06, 0.06), UY + 1.12 + rand(0, 0.1), -6.3 + rand(-0.06, 0.06));
+box(0.3, 0.22, 0.03, std(0xb08a3a, { metalness: 0.4 }), -13.75, UY + 0.92, -6.75);
+[-12.8, -9.6].forEach((x, i) => { box(0.7, 0.55, 0.04, std(0xb08a3a, { metalness: 0.4 }), x, UY + 1.6, -5.02); box(0.6, 0.45, 0.045, std([0x8a6a9a, 0x6a9a8a][i]), x, UY + 1.6, -5.03); });
+addMesh(new THREE.CylinderGeometry(0.3, 0.25, 0.5, 14, 1, true), std(0xc8a070, { side: THREE.DoubleSide }), -9.0, UY + 0.25, -7.6);
+box(0.4, 0.15, 0.35, std(0x6a8ac0, { roughness: 1 }), -9.0, UY + 0.45, -7.6);
+addMesh(new THREE.CylinderGeometry(0.25, 0.25, 0.06, 20), std(0xf0ead8), -11, 5.97, -6.5);
+box(0.08, 0.1, 0.02, new THREE.MeshBasicMaterial({ color: 0xffe9b0 }), -13.2, UY + 0.3, -7.99); // plug-in night light
+fairyLights(-14, -5.1, -8.3, -5.1, 5.85, 24, 0.12);
+
+// --- Bathroom ---
+doorTrim('z', -8.1, -12.2, -11.0, UY, 2.2);
+doorSlab(-12.15, UY, -8.3, 2.75);
+floorPlane(-14, -9.2, -11, -8.2, UY + 0.002, tileTex, 0.5);
+ceilPlane(-14, -9.2, -11, -8.2, 6, 0xeef0f0);
+wall('x', -14.1, -11.2, -8.2, UY, 6, [{ a0: -10.2, a1: -9.0, y0: UY + 1.3, y1: UY + 2.2 }], tileTex, { tile: 0.6 });
+wall('z', -11.1, -14.2, -9.2, UY, 6, [], tileTex, { tile: 0.6 });
+wall('x', -9.23, -11, -8.2, UY, 6, [], tileTex, { t: 0.02, tile: 0.6 });
+wall('z', -8.23, -14, -9.2, UY, 6, [{ a0: -12.2, a1: -11.0, y0: UY, y1: UY + 2.2 }], tileTex, { t: 0.02, tile: 0.6 });
+addWindow('x', -14.1, -1, -10.2, -9.0, UY + 1.3, UY + 2.2, { curtains: null, minY: UY });
+const porcelain = std(0xf6f6f2, { roughness: 0.25 }), chrome = std(0xc0c0c8, { metalness: 0.9, roughness: 0.2 });
+box(1.7, 0.55, 0.75, porcelain, -12.9, UY + 0.275, -10.6);
+box(1.5, 0.02, 0.58, std(0x8ab8d8, { roughness: 0.1 }), -12.9, UY + 0.45, -10.6);
+box(0.06, 0.25, 0.06, chrome, -13.68, UY + 0.65, -10.6);
+addMesh(new THREE.SphereGeometry(0.06, 10, 8), std(0xffd020), -12.4, UY + 0.5, -10.55);
+addMesh(new THREE.SphereGeometry(0.04, 10, 8), std(0xffd020), -12.36, UY + 0.57, -10.55);
+box(0.03, 0.015, 0.03, std(0xff7a1a), -12.32, UY + 0.565, -10.55);
+box(0.4, 0.4, 0.5, porcelain, -9.6, UY + 0.2, -10.65); box(0.42, 0.04, 0.48, porcelain, -9.6, UY + 0.42, -10.6); box(0.45, 0.4, 0.18, porcelain, -9.6, UY + 0.65, -10.9);
+addMesh(new THREE.CylinderGeometry(0.08, 0.1, 0.75, 12), porcelain, -11.2, UY + 0.375, -10.75);
+box(0.55, 0.12, 0.4, porcelain, -11.2, UY + 0.8, -10.78);
+addMesh(new THREE.CylinderGeometry(0.015, 0.015, 0.15), chrome, -11.2, UY + 0.93, -10.93);
+box(0.6, 0.8, 0.02, std(0xd8e4ee, { metalness: 0.9, roughness: 0.05 }), -11.2, UY + 1.6, -10.98);
+box(0.68, 0.88, 0.015, std(0xb08a3a, { metalness: 0.4 }), -11.2, UY + 1.6, -10.99);
+box(0.03, 0.03, 0.8, chrome, -9.27, UY + 1.3, -9.4);
+box(0.05, 0.6, 0.35, std(0xc41e24, { roughness: 1 }), -9.28, UY + 1.05, -9.6); box(0.05, 0.5, 0.35, std(0x2a6a3a, { roughness: 1 }), -9.28, UY + 1.1, -9.2);
+box(0.8, 0.01, 0.5, std(0x6a8ac0, { roughness: 1 }), -12.5, UY + 0.006, -9.9);
+box(0.1, 0.1, 0.02, new THREE.MeshBasicMaterial({ color: 0xbfe0ff }), -9.6, UY + 0.35, -8.25);
+const bathLight = new THREE.PointLight(0x9fc4ff, 1.6, 5, 2);
+bathLight.position.set(-9.8, UY + 0.5, -8.6); scene.add(bathLight);
+
+// --- Parents' bedroom (they're asleep... don't wake them!) ---
+doorTrim('z', -4.9, -11.6, -10.4, UY, 2.2);
+doorSlab(-11.55, UY, -4.7, -2.75);
+floorPlane(-17, -8.2, -4.8, 2, UY + 0.002, beigeCarpetTex, 2);
+ceilPlane(-17, -8.2, -4.8, 2, 6, 0xe8e0d4);
+wall('x', -17.1, -5, 2.2, UY, 6, [{ a0: -3.6, a1: -2.0, y0: UY + 1.0, y1: UY + 2.3 }], parentsTex);
+wall('z', 2.1, -17.2, -8.2, UY, 6, [], parentsTex);
+wall('z', -4.77, -17, -8.2, UY, 6, [{ a0: -11.6, a1: -10.4, y0: UY, y1: UY + 2.2 }], parentsTex, { t: 0.02 });
+wall('x', -8.23, -4.8, 2, UY, 6, [], parentsTex, { t: 0.02 });
+addWindow('x', -17.1, -1, -3.6, -2.0, UY + 1.0, UY + 2.3, { curtains: 0x7a2a3a, minY: UY });
+const PB = -12.5; // bed centre
+box(2.8, 0.01, 3.0, std(0x7a2a3a, { roughness: 1 }), PB, UY + 0.006, 0.4);
+box(2.1, 0.3, 2.3, darkWood, PB, UY + 0.25, 0.8);
+box(2.0, 0.24, 2.2, std(0xf4f1ea), PB, UY + 0.52, 0.8);
+box(2.2, 1.3, 0.1, darkWood, PB, UY + 0.95, 1.97);
+box(2.04, 0.08, 1.6, std(0x3a5a8a, { roughness: 1 }), PB, UY + 0.68, 0.45);
+for (const dx of [-0.5, 0.5]) box(0.7, 0.14, 0.4, std(0xffffff, { roughness: 1 }), PB + dx, UY + 0.72, 1.6);
+const sleepers = [];
+[[-0.5, 0x5a3a20], [0.5, 0x2a2a2a]].forEach(([dx, hair]) => {
+  const g = markDynamic(new THREE.Group()); g.position.set(PB + dx, UY + 0.7, 0.5); scene.add(g);
+  const lump = addMesh(new THREE.SphereGeometry(0.35, 14, 10), std(0x3a5a8a, { roughness: 1 }), 0, 0.02, 0, { parent: g }); lump.scale.set(0.9, 0.35, 1.9);
+  addMesh(new THREE.SphereGeometry(0.13, 14, 12), std(0xf0c09c), 0, 0.12, 1.02, { parent: g });
+  addMesh(new THREE.SphereGeometry(0.135, 14, 12, 0, Math.PI * 2, 0, Math.PI / 2), std(hair, { roughness: 1 }), 0, 0.15, 1.05, { parent: g }).rotation.x = -0.6;
+  sleepers.push(lump);
+});
+for (const x of [PB - 1.4, PB + 1.4]) {
+  box(0.55, 0.55, 0.45, darkWood, x, UY + 0.275, 1.7);
+  addMesh(new THREE.CylinderGeometry(0.05, 0.08, 0.25, 10), std(0xc8a040, { metalness: 0.6 }), x, UY + 0.68, 1.75);
+  addMesh(new THREE.CylinderGeometry(0.1, 0.16, 0.2, 16, 1, true), std(0xf0e4c8, { side: THREE.DoubleSide }), x, UY + 0.88, 1.75);
+}
+box(0.18, 0.1, 0.07, std(0x222222), PB + 1.3, UY + 0.6, 1.6);
+const pClock = addMesh(new THREE.PlaneGeometry(0.15, 0.075), new THREE.MeshBasicMaterial({ map: alarmTex }), PB + 1.3, UY + 0.6, 1.564); pClock.rotation.y = Math.PI;
+box(0.7, 2.2, 1.4, darkWood, -16.6, UY + 1.1, 0.8);
+box(0.01, 2.0, 0.01, std(0x111111), -16.24, UY + 1.1, 0.8);
+for (const z of [0.7, 0.9]) box(0.03, 0.2, 0.03, knobMat, -16.23, UY + 1.15, z);
+box(0.5, 1.0, 1.6, darkWood, -8.55, UY + 0.5, -2.5);                       // dresser
+for (const y of [0.25, 0.55, 0.85]) box(0.02, 0.22, 1.5, std(0x5a3a22), -8.8, UY + y, -2.5);
+box(0.03, 0.9, 1.1, std(0xd8e4ee, { metalness: 0.9, roughness: 0.05 }), -8.24, UY + 1.6, -2.5); // mirror
+box(0.3, 0.2, 0.22, std(0x222222, { roughness: 0.8 }), -8.6, UY + 1.1, -2.1);  // Dad's camera bag
+const filmMat = new THREE.MeshStandardMaterial({ color: 0xffd040, emissive: 0xffb000, emissiveIntensity: 0.8, roughness: 0.4 });
+const filmPickup = markDynamic(addMesh(new THREE.CylinderGeometry(0.04, 0.04, 0.07, 14), filmMat, -8.6, UY + 1.04, -2.75));
+box(0.08, 0.05, 0.15, std(0x6a3a20), -12.0, UY + 0.03, -0.55); box(0.08, 0.05, 0.15, std(0x6a3a20), -11.85, UY + 0.03, -0.5); // slippers
+chair(-16.2, -1.0, Math.PI / 2, UY);
+box(0.4, 0.06, 0.4, std(0x6a8ac0, { roughness: 1 }), -16.2, UY + 0.53, -1.0); // folded clothes
+
+// --- Study (downstairs, behind the living room) ---
+doorTrim('z', -8.1, 2.1, 3.3, 0, 2.3);
+doorSlab(2.15, 0, -8.3, 2.75);
+floorPlane(-1, 6, -13, -8.2, 0.001, floorTex, 4);
+ceilPlane(-1, 6, -13, -8.2, 3.0, 0xd8cfc0);
+wall('z', -13.1, -1.2, 6.2, 0, 3, [{ a0: 1.2, a1: 3.4, y0: 1.0, y1: 2.3 }], studyTex);
+wall('x', -1.1, -13.2, -8.2, 0, 3, [], studyTex);
+wall('x', 6.1, -13.2, -8.2, 0, 3, [], studyTex);
+wall('z', -8.23, -1, 6, 0, 3, [{ a0: 2.1, a1: 3.3, y0: 0, y1: 2.3 }], studyTex, { t: 0.02 });
+addWindow('z', -13.1, -1, 1.2, 3.4, 1.0, 2.3, { curtains: 0x5a2a1a });
+box(3.0, 0.01, 2.2, std(0x5a1a20, { roughness: 1 }), 2.5, 0.006, -10.5);
+// desk, banker's lamp (on), computer
+box(1.6, 0.05, 0.8, darkWood, 2.3, 0.75, -12.4);
+for (const x of [1.7, 2.9]) box(0.4, 0.73, 0.75, darkWood, x, 0.365, -12.4);
+addMesh(new THREE.CylinderGeometry(0.07, 0.08, 0.03, 14), std(0xc8a040, { metalness: 0.8 }), 2.85, 0.79, -12.3);
+addMesh(new THREE.CylinderGeometry(0.01, 0.01, 0.3), std(0xc8a040, { metalness: 0.8 }), 2.85, 0.94, -12.3);
+const shade = addMesh(new THREE.CylinderGeometry(0.1, 0.1, 0.3, 16, 1, false, 0, Math.PI), std(0x1f7a3a, { emissive: 0x0a3a1a, roughness: 0.3, side: THREE.DoubleSide }), 2.85, 1.1, -12.3);
+shade.rotation.z = Math.PI / 2;
+const studyLamp = new THREE.PointLight(0xffd9a0, 2.6, 7, 1.8);
+studyLamp.position.set(2.85, 1.0, -12.2); scene.add(studyLamp);
+box(0.6, 0.38, 0.04, std(0x111111), 2.1, 1.07, -12.65);
+box(0.06, 0.2, 0.06, std(0x111111), 2.1, 0.87, -12.65);
+const screenTex = textTex(256, 160, (g) => {
+  g.fillStyle = '#04102a'; g.fillRect(0, 0, 256, 160); g.fillStyle = '#fff'; for (let i = 0; i < 50; i++) g.fillRect(rand(0, 256), rand(0, 160), 2, 2);
+  g.fillStyle = '#f2c14e'; g.font = 'bold 26px Georgia'; g.fillText('Merry Christmas!', 22, 90);
+});
+addMesh(new THREE.PlaneGeometry(0.56, 0.34), new THREE.MeshBasicMaterial({ map: screenTex }), 2.1, 1.07, -12.628);
+box(0.45, 0.02, 0.15, std(0x222222), 2.1, 0.785, -12.2);
+addMesh(new THREE.CylinderGeometry(0.04, 0.035, 0.1, 12), std(0xc41e24), 1.65, 0.82, -12.2);
+// office chair
+addMesh(new THREE.CylinderGeometry(0.25, 0.25, 0.08, 16), std(0x222222), 2.3, 0.48, -11.6);
+box(0.45, 0.55, 0.06, std(0x222222), 2.3, 0.8, -11.38);
+addMesh(new THREE.CylinderGeometry(0.03, 0.03, 0.4), std(0x777777, { metalness: 0.8 }), 2.3, 0.24, -11.6);
+for (let i = 0; i < 5; i++) { const a = i / 5 * Math.PI * 2; box(0.3, 0.03, 0.04, std(0x222222), 2.3 + Math.cos(a) * 0.15, 0.04, -11.6 + Math.sin(a) * 0.15).rotation.y = -a; }
+// bookshelves along the west wall
+box(0.04, 2.6, 4.0, darkWood, -0.98, 1.3, -10.8);
+for (const z of [-12.8, -8.8]) box(0.4, 2.6, 0.05, darkWood, -0.8, 1.3, z);
+for (let i = 0; i < 6; i++) box(0.4, 0.04, 4.0, darkWood, -0.8, 0.02 + i * 0.5, -10.8);
+for (let i = 0; i < 5; i++) shelfBooksZ(-12.75, -8.85, 0.04 + i * 0.5, -0.8, 0.32);
+// globe
+addMesh(new THREE.CylinderGeometry(0.15, 0.2, 0.05, 16), darkWood, 5.2, 0.03, -9.2);
+addMesh(new THREE.CylinderGeometry(0.02, 0.02, 0.75), darkWood, 5.2, 0.4, -9.2);
+const globeTex = canvasTex(256, 128, (g) => { g.fillStyle = '#2a5a9a'; g.fillRect(0, 0, 256, 128); g.fillStyle = '#4a8a3a'; for (let i = 0; i < 9; i++) { g.beginPath(); g.ellipse(rand(0, 256), rand(20, 108), rand(10, 30), rand(8, 22), rand(0, 3), 0, Math.PI * 2); g.fill(); } });
+addMesh(new THREE.SphereGeometry(0.22, 20, 14), new THREE.MeshStandardMaterial({ map: globeTex, roughness: 0.4 }), 5.2, 1.0, -9.2);
+const meridian = addMesh(new THREE.TorusGeometry(0.25, 0.01, 6, 24), std(0xc8a040, { metalness: 0.8 }), 5.2, 1.0, -9.2); meridian.rotation.y = 0.4;
+// upright piano
+box(0.6, 1.25, 1.5, std(0x111111, { roughness: 0.2 }), 5.7, 0.625, -11.0);
+box(0.25, 0.06, 1.4, std(0xf6f2ea, { roughness: 0.3 }), 5.33, 0.75, -11.0);
+for (let i = 0; i < 14; i++) if (![2, 6, 9, 13].includes(i)) box(0.13, 0.03, 0.035, std(0x111111), 5.3, 0.785, -11.62 + i * 0.09);
+const music = addMesh(new THREE.PlaneGeometry(0.35, 0.25), std(0xfffaf0, { side: THREE.DoubleSide }), 5.38, 1.05, -11.0); music.rotation.y = -Math.PI / 2; music.rotation.x = 0;
+box(0.4, 0.45, 0.8, std(0x111111, { roughness: 0.3 }), 4.95, 0.225, -11.0);
+// leather armchair and a reading lamp (off)
+const leather = std(0x5a2a1a, { roughness: 0.5 });
+box(1.0, 0.45, 0.9, leather, 0.9, 0.25, -9.5); box(1.0, 0.9, 0.2, leather, 0.9, 0.7, -9.95); box(0.15, 0.6, 0.9, leather, 0.42, 0.42, -9.5); box(0.15, 0.6, 0.9, leather, 1.38, 0.42, -9.5);
+addMesh(new THREE.CylinderGeometry(0.015, 0.015, 1.5), std(0xc8a040, { metalness: 0.8 }), 0.0, 0.75, -10.5);
+addMesh(new THREE.CylinderGeometry(0.15, 0.22, 0.25, 16, 1, true), std(0xf0e4c8, { side: THREE.DoubleSide }), 0.0, 1.55, -10.5);
+// framed certificate & a Christmas card on the wall
+box(0.6, 0.45, 0.03, std(0xb08a3a, { metalness: 0.4 }), 4.5, 1.7, -8.27); box(0.5, 0.35, 0.035, std(0xf4ead4), 4.5, 1.7, -8.28);
+fairyLights(-0.9, -8.4, 5.9, -8.4, 2.85, 26, 0.1);
 
 // Build the instanced books and fairy lights
 {
@@ -1078,8 +1294,14 @@ camera.add(flashLight); scene.add(camera);
     for (const name of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(name)) g.deleteAttribute(name);
     if (!g.attributes.normal || !g.attributes.uv) return;
     g.clearGroups(); g.applyMatrix4(o.matrixWorld);
-    if (!groups.has(o.material)) groups.set(o.material, []);
-    groups.get(o.material).push(g);
+    let mat = o.material;
+    if (mat.userData.tiledBase) {
+      const uv = g.attributes.uv, { x: rx, y: ry } = mat.map.repeat;
+      for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * rx, uv.getY(i) * ry);
+      mat = mat.userData.tiledBase;
+    }
+    if (!groups.has(mat)) groups.set(mat, []);
+    groups.get(mat).push(g);
     if (occ.has(o)) o.visible = false; else remove.push(o);
   });
   for (const o of remove) o.parent.remove(o);
@@ -1089,44 +1311,82 @@ camera.add(flashLight); scene.add(camera);
 // ---------------------------------------------------------------------------
 // Where you can walk
 // ---------------------------------------------------------------------------
-// Walkable areas for the player's centre: [minX, maxX, minZ, maxZ]
+// Walkable areas for the player's centre: [minX, maxX, minZ, maxZ, floor height] ('living' = landing/stairs/floor)
+const LIVING = 'living';
 const AREAS = [
-  [-7.7, 7.7, -7.7, 7.7],     // living room (incl. landing & stairs)
-  [-8.6, -7.4, 4.3, 7.2],     // archway
-  [-16.7, -8.5, -0.7, 7.7],   // kitchen & dining room
-  [-5.9, -5.3, -8.6, -7.4],   // bedroom door
-  [-8.7, -3.3, -13.7, -8.5],  // bedroom
+  [-7.7, 7.7, -7.7, 7.7, LIVING],    // living room (incl. landing & stairs)
+  [-8.6, -7.4, 4.3, 7.2, 0],         // archway
+  [-16.7, -8.5, -0.7, 7.7, 0],       // kitchen & dining room
+  [2.38, 3.02, -8.6, -7.4, 0],       // study door
+  [-0.7, 5.7, -12.7, -8.5, 0],       // study
+  [-5.9, -5.3, -8.6, -7.4, 3],       // your bedroom door
+  [-8.7, -3.3, -13.7, -8.5, 3],      // your bedroom
+  [-8.6, -7.4, -6.92, -6.18, 3],     // landing → hallway
+  [-13.7, -8.5, -7.7, -5.2, 3],      // hallway
+  [-11.92, -11.28, -8.6, -7.4, 3],   // bathroom door
+  [-13.7, -9.5, -10.7, -8.5, 3],     // bathroom
+  [-11.32, -10.68, -5.4, -4.4, 3],   // parents' door
+  [-16.7, -8.5, -4.5, 1.7, 3],       // parents' bedroom
 ];
-// Furniture you bump into: [minX, maxX, minZ, maxZ]
+// Furniture you bump into: [minX, maxX, minZ, maxZ, floor] (no floor = every level)
 const blockers = [
-  [-1.05, 0.15, -1.8, 1.8],   // sofa
-  [1.75, 2.85, -0.85, 0.85],  // coffee table
-  [6.55, 8, -2.1, 2.1],       // fireplace
-  [7.15, 7.75, 2.3, 3.1], [7.15, 7.75, -2.8, -2.3], // nutcrackers & log pile
-  [-6.07, -5.93, -5, 2.4],    // stair banister
-  [-6.1, -5.9, 2.5, 2.7],     // newel post
-  [-5.85, -5.15, 7.4, 8],     // grandfather clock
-  [3.85, 4.95, 4.3, 6.25],    // armchair + footstool
-  [-0.85, -0.15, -2.95, -2.25], // side table
-  [-0.8, 1.8, -8, -7.55],     // bookshelf
-  [7.0, 7.7, 7.0, 7.7], [-3.85, -3.15, -7.75, -7.05], // plants
-  // bedroom
-  [-9, -7.5, -13.7, -11.2], [-7.5, -7.0, -13.75, -13.25], [-3.8, -3.0, -12.9, -11.5], [-4.35, -3.8, -12.45, -11.95],
-  [-3.65, -3.0, -10.15, -9.05], [-4.25, -3.25, -14, -13.6], [-7.35, -6.05, -8.95, -8.3],
+  [-1.05, 0.15, -1.8, 1.8, 0],   // sofa
+  [1.75, 2.85, -0.85, 0.85, 0],  // coffee table
+  [6.55, 8, -2.1, 2.1, 0],       // fireplace
+  [7.15, 7.75, 2.3, 3.1, 0], [7.15, 7.75, -2.8, -2.3, 0], // nutcrackers & log pile
+  [-6.07, -5.93, -5, 2.4],       // stair banister
+  [-6.1, -5.9, 2.5, 2.7],        // newel post
+  [-5.85, -5.15, 7.4, 8, 0],     // grandfather clock
+  [3.85, 4.95, 4.3, 6.25, 0],    // armchair + footstool
+  [-0.85, -0.15, -2.95, -2.25, 0], // side table
+  [-0.8, 1.8, -8, -7.55, 0],     // bookshelf
+  [7.0, 7.7, 7.0, 7.7, 0], [-3.85, -3.15, -7.75, -7.05, 0], // plants
+  // your bedroom
+  [-9, -7.5, -13.7, -11.2, 3], [-7.5, -7.0, -13.75, -13.25, 3], [-3.8, -3.0, -12.9, -11.5, 3], [-4.35, -3.8, -12.45, -11.95, 3],
+  [-3.65, -3.0, -10.15, -9.05, 3], [-4.25, -3.25, -14, -13.6, 3], [-7.35, -6.05, -8.95, -8.3, 3],
   // kitchen
-  [-17, -16.25, -0.7, 5.45], [-16.3, -12.95, -1.0, -0.28], [-17, -16.08, 6.48, 7.42], [-12.7, -10.3, 2.0, 5.6],
+  [-17, -16.25, -0.7, 5.45, 0], [-16.3, -12.95, -1.0, -0.28, 0], [-17, -16.08, 6.48, 7.42, 0], [-12.7, -10.3, 2.0, 5.6, 0],
+  // hallway, bathroom, parents' room
+  [-14, -13.5, -7.15, -5.85, 3], [-9.35, -8.65, -7.95, -7.25, 3],
+  [-13.8, -12.0, -11, -10.2, 3], [-9.95, -9.2, -11, -10.2, 3], [-11.5, -10.9, -11, -10.4, 3], [-13.3, -12.1, -8.95, -8.3, 3],
+  [-13.6, -11.4, -0.4, 2, 3], [-14.3, -13.6, 1.4, 2, 3], [-11.4, -10.7, 1.4, 2, 3], [-17, -16.2, 0.05, 1.55, 3], [-8.85, -8.2, -3.35, -1.65, 3],
+  [-12.7, -11.5, -4.75, -4.1, 3], [-16.5, -15.9, -1.3, -0.7, 3],
+  // study
+  [1.45, 3.15, -12.85, -11.95, 0], [2.0, 2.6, -11.9, -11.3, 0], [-1, -0.5, -12.85, -8.75, 0], [5.3, 6, -11.8, -10.2, 0],
+  [4.7, 5.25, -11.45, -10.55, 0], [4.95, 5.45, -9.45, -8.95, 0], [0.35, 1.45, -10.1, -9.0, 0], [-0.2, 0.2, -10.7, -10.3, 0], [1.0, 2.2, -8.95, -8.3, 0],
 ];
 const TREE_R = 1.45;
 
-function floorAt(x, z) {
-  if (x < -8) return 0;                       // kitchen
-  if (z < -8) return LANDING_Y;               // bedroom
-  if (x < -4 && z < -5) return LANDING_Y;     // landing
-  if (x < -6 && z >= -5 && z < 3) return Math.max(0, stepH(z)); // stairs
+function livingFloor(x, z) {
+  if (x < -4 && z < -5) return LANDING_Y;                                // landing
+  if (x < -6 && z >= -5 && z < 3) return Math.max(0, stepH(z));           // stairs
   return 0;
 }
+// the floor height you'd stand on at (x, z), coming from height `from` (null = can't go there)
+function walkFloor(x, z, from) {
+  for (const [a, b, c, d, f] of AREAS) {
+    if (x < a || x > b || z < c || z > d) continue;
+    const y = f === LIVING ? livingFloor(x, z) : f;
+    if (Math.abs(y - from) <= 0.3) return y;
+  }
+  return null;
+}
+function hitsBlocker(x, z, floorY, r) {
+  for (const [a, b, c, d, lvl] of blockers) {
+    if (lvl !== undefined && Math.abs(lvl - floorY) > 1.2) continue;
+    if (x > a - r && x < b + r && z > c - r && z < d + r) return true;
+  }
+  return floorY < 1 && Math.hypot(x - TREE.x, z - TREE.z) < TREE_R + r;
+}
 const stepIndexAt = (x, z) => (x < -6 && x > -8 && z >= -5 && z < 3) ? Math.floor((z + 5) / STEP_D) : -1;
-const roomOf = (x, z) => x < -8 ? 'kitchen' : z < -8 ? 'bedroom' : 'living';
+function roomOf(x, z, y = 0) {
+  if (y > 2) {
+    if (x > -8) return z < -8 ? 'bedroom' : 'living';
+    if (z < -8.1) return 'bathroom';
+    return z < -4.9 ? 'hallway' : 'parents';
+  }
+  return x < -8 ? 'kitchen' : z < -8 ? 'study' : 'living';
+}
 
 // ---------------------------------------------------------------------------
 // Presents
@@ -1230,10 +1490,20 @@ function setBubble(sym, color) {
 setBubble('', '');
 
 // Santa's to-do list for the night
+const DIFFS = {
+  easy:   { label: 'Easy',   film: 3, cos: 0.35, range: 13, gain: 75,  still: 0.12, decay: 6,   hear: 15, photo: 10,  frame: 0.6,  glance: [4.5, 8],   toward: 0.5,  speed: 1.15, dur: 1.0,  flash: 55,  stalk: false, desc: 'A sleepy Santa. Good for learning the house.' },
+  normal: { label: 'Normal', film: 3, cos: 0.22, range: 15, gain: 100, still: 0.2,  decay: 4,   hear: 18, photo: 8.5, frame: 0.5,  glance: [3.2, 6],   toward: 0.65, speed: 1.3,  dur: 0.85, flash: 80,  stalk: true,  desc: 'Sharp eyes and ears. He comes over to check out noises.' },
+  hard:   { label: 'Hard',   flashFlee: true, film: 2, cos: 0.1,  range: 17, gain: 130, still: 0.3,  decay: 2.5, hear: 21, photo: 7,   frame: 0.42, glance: [2.2, 4.5], toward: 0.8,  speed: 1.45, dur: 0.7,  flash: 100, stalk: true,  desc: 'Only 2 shots, he checks over his shoulder constantly, and a missed flash sends him up the chimney.' },
+};
+let diffKey = 'normal';
+try { const saved = localStorage.getItem('catchSantaDifficulty'); if (DIFFS[saved]) diffKey = saved; } catch (e) { /* storage unavailable */ }
+let DIFF = DIFFS[diffKey];
+
 const TREE_LABEL = 'Santa is putting presents under the tree';
 const TASKS = [
   { type: 'present', path: [[3.9, -3.9]], face: [TREE.x, TREE.z], dur: 4.5, label: TREE_LABEL },
-  { type: 'present', path: [[3.3, -5.8]], face: [TREE.x, TREE.z], dur: 4.5, label: TREE_LABEL },
+  { type: 'present', path: [[2.7, -6.6], [2.7, -9.2], [3.6, -10.9]], face: [3.2, -12.2], spot: [3.55, -11.85], dur: 4.5, label: 'Santa is leaving a present in the study' },
+  { type: 'present', path: [[2.7, -9.2], [2.7, -6.8], [3.3, -5.8]], face: [TREE.x, TREE.z], dur: 4.5, label: TREE_LABEL },
   { type: 'cookies', path: [[2.0, -1.8], [1.3, 0]], face: [2.3, 0], dur: 8.5, label: 'Santa is eating the cookies!' },
   { type: 'carrots', path: [[1.3, 2.6], [-5, 5.6], [-9, 6.4], [-13, 6.4], [-15.6, 3.25]], face: [-17, 3.25], dur: 5, label: 'Santa went to the kitchen for the reindeer\'s carrots' },
   { type: 'stocking', idx: 2, path: [[-13, 6.4], [-9, 6.4], [-5, 5.6], [3.5, 3.6], [6.1, 1.2]], face: [8, 1.2], dur: 3.2, label: 'Santa is filling the stockings' },
@@ -1246,6 +1516,7 @@ const TASKS = [
 const TOTAL_PRESENTS = TASKS.filter((t) => t.type === 'present').length;
 
 const S = {
+  scale: 0.42, chimFrom: null, resumeTimer: null,
   pos: new THREE.Vector3(6.3, 6, 0), heading: -Math.PI / 2, headYaw: 0,
   state: 'waiting', timer: 0, taskIdx: -1, path: [], task: null,
   suspicion: 0, glanceTimer: rand(4, 6), glanceT: 0, glanceYaw: 0,
@@ -1298,6 +1569,14 @@ function tone(freq, dur, vol, type = 'sine', delay = 0) {
   o.connect(g).connect(master); o.start(t); o.stop(t + dur + 0.05);
 }
 function sfxJingle(vol) { for (let i = 0; i < 3; i++) { const f = rand(2600, 4300); tone(f, 0.3, vol, 'sine', i * 0.035 + rand(0, 0.03)); tone(f * 2.76, 0.12, vol * 0.3, 'sine', i * 0.035); } }
+function sfxSnore(vol) {
+  if (!actx) return;
+  const t = actx.currentTime, s = actx.createBufferSource(); s.buffer = noiseBuf;
+  const f = actx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 260; f.Q.value = 4;
+  const g = actx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.7); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.5);
+  const lfo = actx.createOscillator(); lfo.frequency.value = 32; const lg = actx.createGain(); lg.gain.value = vol * 0.6; lfo.connect(lg).connect(g.gain);
+  s.connect(f).connect(g).connect(master); s.start(t, Math.random()); s.stop(t + 1.6); lfo.start(t); lfo.stop(t + 1.6);
+}
 function sfxChime() { [659, 784, 988, 1319].forEach((f, i) => tone(f, 1.2, 0.12, 'triangle', i * 0.12)); }
 function sfxWhoosh() { if (!actx) return; const t = actx.currentTime; const s = actx.createBufferSource(); s.buffer = noiseBuf; const f = actx.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 2; f.frequency.setValueAtTime(300, t); f.frequency.exponentialRampToValueAtTime(3000, t + 1.2); const g = actx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.4, t + 0.3); g.gain.exponentialRampToValueAtTime(0.0005, t + 1.4); s.connect(f).connect(g).connect(master); s.start(t); s.stop(t + 1.5); }
 function say(text, pitch = 0.5, rate = 0.85, volume = 1) {
@@ -1310,6 +1589,8 @@ function say(text, pitch = 0.5, rate = 0.85, volume = 1) {
 const player = { x: -7.0, z: -10.6, floor: LANDING_Y, eye: LANDING_Y + 1.6, vx: 0, vz: 0, stepAcc: 0, lastStep: -1, noise: 0, bob: 0, moving: 0 };
 let yaw = -2.68, pitch = -0.1;
 let film = 3;
+let filmMax = 3;
+function showFilm() { $('filmCount').textContent = '●'.repeat(film) + '○'.repeat(Math.max(0, filmMax - film)); }
 let game = 'intro'; // intro | playing | paused | ended
 let dragLook = false; // fallback when pointer lock isn't available
 let touchMode = false; // on-screen controls for phones and tablets
@@ -1427,11 +1708,8 @@ tapButton('btnRun', () => { touch.run = !touch.run; if (touch.run) touch.crouch 
 tapButton('btnPause', () => setPaused(true));
 
 function blocked(x, z) {
-  if (!AREAS.some(([a, b, c, d]) => x >= a && x <= b && z >= c && z <= d)) return true;
-  const r = 0.28;
-  for (const [a, b, c, d] of blockers) if (x > a - r && x < b + r && z > c - r && z < d + r) return true;
-  if (Math.hypot(x - TREE.x, z - TREE.z) < TREE_R + r) return true;
-  return Math.abs(floorAt(x, z) - player.floor) > 0.3;
+  const f = walkFloor(x, z, player.floor);
+  return f === null || hitsBlocker(x, z, f, 0.28);
 }
 
 function updatePlayer(dt) {
@@ -1450,8 +1728,8 @@ function updatePlayer(dt) {
   player.vz = lerp(player.vz, dz * speed, k);
   const ox = player.x, oz = player.z;
   const nx = player.x + player.vx * dt, nz = player.z + player.vz * dt;
-  if (!blocked(nx, player.z)) { player.x = nx; player.floor = floorAt(player.x, player.z); } else player.vx = 0;
-  if (!blocked(player.x, nz)) { player.z = nz; player.floor = floorAt(player.x, player.z); } else player.vz = 0;
+  if (!blocked(nx, player.z)) { player.x = nx; player.floor = walkFloor(player.x, player.z, player.floor); } else player.vx = 0;
+  if (!blocked(player.x, nz)) { player.z = nz; player.floor = walkFloor(player.x, player.z, player.floor); } else player.vz = 0;
   const moved = Math.hypot(player.x - ox, player.z - oz);
   player.moving = moved / dt;
 
@@ -1488,28 +1766,58 @@ function updatePlayer(dt) {
 
 function makeNoise(amount, minHear) {
   player.noise = clamp(player.noise + amount * 2.2, 0, 100);
+  disturbParents(amount);
   const d = Math.hypot(S.pos.x - player.x, S.pos.z - player.z);
   if (!santaPresent()) return;
-  const muffle = roomOf(player.x, player.z) === roomOf(S.pos.x, S.pos.z) ? 1 : 0.5;
-  const f = Math.max(clamp(1 - d / 15, 0, 1), minHear) * muffle;
+  const muffle = roomOf(player.x, player.z, player.floor) === roomOf(S.pos.x, S.pos.z) ? 1 : 0.5;
+  const f = Math.max(clamp(1 - d / DIFF.hear, 0, 1), minHear) * muffle;
   const add = amount * f;
   if (add <= 0) return;
   S.suspicion += add;
   if (add > 7 && canReact()) startInvestigate(player.x, player.z, 2.6);
 }
 
+// Making noise near your sleeping parents wakes them up
+let parentWake = 0, parentWarned = false;
+function disturbParents(amount) {
+  const room = roomOf(player.x, player.z, player.floor);
+  const k = room === 'parents' ? 2.2 : room === 'hallway' ? 0.5 : 0;
+  if (!k) return;
+  parentWake += amount * k;
+  if (parentWake > 45 && !parentWarned) { parentWarned = true; warn('Dad is stirring… tiptoe!', 2.2); say('Mmmph… hmm?', 0.3, 0.7, 0.6); }
+  if (parentWake >= 100) loseParents();
+}
+function updateParents(dt) {
+  parentWake = Math.max(0, parentWake - dt * 10);
+  if (parentWake < 20) parentWarned = false;
+  if (filmPickup.visible && player.floor > 2 && Math.hypot(player.x - filmPickup.position.x, player.z - filmPickup.position.z) < 1.2) {
+    filmPickup.visible = false; film++; filmMax = Math.max(filmMax, film); showFilm();
+    sfxChime(); toast('Found a roll of film in Dad\'s camera bag! <b>+1 shot</b>', 3);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Santa behaviour
 // ---------------------------------------------------------------------------
-const santaPresent = () => ['arrive', 'walk', 'task', 'flee'].includes(S.state) || (S.state === 'chimney' && S.rise < 0.5);
+const santaPresent = () => ['arrive', 'walk', 'task', 'flee'].includes(S.state) || (S.state === 'chimney' && S.pos.y < 0.6);
 const canReact = () => ['walk', 'task', 'arrive'].includes(S.state);
 
 function startInvestigate(x, z, t) {
   if (!S.invest) {
     tone(220, 0.35, 0.05, 'triangle');
     if (Math.random() < 0.5) say(['Hmm?', 'Hm? Who\'s there?', 'Hmmm…'][(Math.random() * 3) | 0], 0.4, 0.8, 0.6);
+    S.invest = { x, z, t, home: S.pos.clone(), walked: 0 };
+  } else Object.assign(S.invest, { x, z, t: Math.max(S.invest.t, t) });
+}
+const santaCanStand = (x, z) => walkFloor(x, z, 0) === 0 && !hitsBlocker(x, z, 0, 0.35);
+function endInvestigate() {
+  const inv = S.invest; S.invest = null;
+  S.glanceTimer = Math.min(S.glanceTimer, 1.2); // double take
+  if (inv && inv.walked > 0.1 && S.state !== 'flee') {
+    // walk back to where he was before carrying on
+    if (S.state === 'task') { S.resumeTimer = S.timer; S.state = 'walk'; S.path = []; }
+    S.path.unshift(inv.home);
   }
-  S.invest = { x, z, t };
 }
 
 function startTask(i) {
@@ -1539,9 +1847,12 @@ function updateSanta(dt) {
   let desired = S.heading, moveSpeed = 0;
 
   if (S.state === 'arrive') {
+    // drops down inside the chimney (shrunk to fit), then steps out of the fireplace
     S.timer -= dt;
-    S.pos.y = Math.max(0, S.pos.y - dt * 5);
-    if (S.timer <= 0) startTask(0);
+    if (S.pos.y > 0) S.pos.y = Math.max(0, S.pos.y - dt * 4);
+    else { S.pos.x = Math.max(6.5, S.pos.x - dt * 1.5); S.scale = Math.min(1, S.scale + dt * 1.2); }
+    if (S.pos.y < 3.4) santa.root.visible = true;
+    if (S.timer <= 0 && S.scale >= 1) startTask(0);
   }
 
   // investigating pauses everything
@@ -1549,16 +1860,22 @@ function updateSanta(dt) {
     S.invest.t -= dt;
     desired = Math.atan2(S.invest.x - S.pos.x, S.invest.z - S.pos.z);
     S.headYaw = lerp(S.headYaw, 0, 1 - Math.exp(-dt * 6));
-    if (S.invest.t <= 0) S.invest = null;
+    const dx = S.invest.x - S.pos.x, dz = S.invest.z - S.pos.z, d = Math.hypot(dx, dz);
+    if (DIFF.stalk && S.state !== 'arrive' && S.suspicion > 45 && S.invest.walked < 3 && d > 1.6 && Math.abs(angleDiff(S.heading, desired)) < 0.5
+        && roomOf(S.invest.x, S.invest.z, player.floor) === roomOf(S.pos.x, S.pos.z)) {
+      const step = 0.9 * dt, nx = S.pos.x + dx / d * step, nz = S.pos.z + dz / d * step;
+      if (santaCanStand(nx, nz)) { S.pos.x = nx; S.pos.z = nz; S.invest.walked += step; moveSpeed = 0.9; }
+    }
+    if (S.invest.t <= 0) endInvestigate();
   } else if (S.state === 'walk' || S.state === 'flee') {
     const tgt = S.path[0];
     const dx = tgt.x - S.pos.x, dz = tgt.z - S.pos.z, d = Math.hypot(dx, dz);
-    moveSpeed = S.state === 'flee' ? 4.2 : 1.15;
+    moveSpeed = S.state === 'flee' ? 4.2 + DIFF.speed - 1.15 : DIFF.speed;
     if (d < 0.08) {
       S.path.shift();
       if (!S.path.length) {
         if (S.state === 'flee') { S.state = 'chimney'; S.rise = 0; S.timer = 0.5; }
-        else { S.state = 'task'; S.timer = S.task.dur; S.taskElapsed = 0; }
+        else { S.state = 'task'; if (S.resumeTimer != null) { S.timer = S.resumeTimer; S.resumeTimer = null; } else { S.timer = S.task.dur * DIFF.dur; S.taskElapsed = 0; } }
       }
       moveSpeed = 0;
     } else {
@@ -1591,29 +1908,34 @@ function updateSanta(dt) {
   } else if (S.state === 'chimney') {
     S.timer -= dt;
     if (S.timer <= 0) {
-      if (S.rise === 0) { sfxWhoosh(); say('Ho ho ho! Merry Christmas!', 0.4, 0.85, 0.8); spawnSparkles(); }
-      S.rise += dt / 1.3;
-      S.pos.x = lerp(S.pos.x, 7.35, 1 - Math.exp(-dt * 4));
-      S.pos.y = S.rise * S.rise * 6;
-      S.heading += dt * 9;
+      if (S.rise === 0) { sfxWhoosh(); say('Ho ho ho! Merry Christmas!', 0.4, 0.85, 0.8); spawnSparkles(); S.chimFrom = S.pos.clone(); }
+      S.rise = Math.min(1, S.rise + dt / 1.7);
+      // 1) step back into the fireplace, shrinking to fit inside the chimney
+      const enter = clamp(S.rise / 0.4, 0, 1), e = enter * enter * (3 - 2 * enter);
+      S.pos.x = lerp(S.chimFrom.x, 7.55, e); S.pos.z = lerp(S.chimFrom.z, 0, e);
+      S.scale = lerp(1, 0.42, e);
+      // 2) zoom straight up behind the bricks
+      const up = clamp((S.rise - 0.4) / 0.6, 0, 1);
+      S.pos.y = up * up * 6;
+      if (S.pos.y > 2.6) santa.root.visible = false;
       if (S.rise >= 1) { S.state = 'gone'; santa.root.visible = false; setTimeout(() => lose(), 600); }
     }
-    desired = S.heading;
+    desired = -Math.PI / 2; // faces the room as he goes
   }
 
   // glance timer
   if (canReact() && !S.invest) {
     if (S.glanceT > 0) S.glanceT -= dt;
     else if ((S.glanceTimer -= dt) <= 0) {
-      S.glanceTimer = rand(4.5, 8);
+      S.glanceTimer = rand(DIFF.glance[0], DIFF.glance[1]);
       S.glanceT = rand(1.3, 2.0);
       // Santa has a sixth sense: often glances toward you
       const toPlayer = angleDiff(S.state === 'task' ? Math.atan2(S.task.face[0] - S.pos.x, S.task.face[1] - S.pos.z) : S.heading, Math.atan2(player.x - S.pos.x, player.z - S.pos.z));
-      S.glanceYaw = Math.random() < 0.55 ? toPlayer + rand(-0.4, 0.4) : rand(-2.4, 2.4);
+      S.glanceYaw = Math.random() < DIFF.toward ? toPlayer + rand(-0.4, 0.4) : rand(-2.4, 2.4);
     }
   }
 
-  if (S.state !== 'chimney') S.heading += clamp(angleDiff(S.heading, desired), -dt * 4.5, dt * 4.5);
+  S.heading += clamp(angleDiff(S.heading, desired), -dt * (S.state === 'chimney' ? 8 : 4.5), dt * (S.state === 'chimney' ? 8 : 4.5));
   S.speed = moveSpeed;
 
   // --- vision ---
@@ -1625,17 +1947,17 @@ function updateSanta(dt) {
     const cos = flat.dot(santaSpots());
     losTimer -= dt;
     if (losTimer <= 0) { losTimer = 0.1; losClear = lineOfSight(eye, pp); }
-    const inCone = cos > 0.35 && d < 13;
+    const inCone = cos > DIFF.cos && d < DIFF.range;
     if (inCone && losClear) {
-      const f = Math.pow(clamp(1 - d / 13, 0, 1), 0.7);
-      const mv = player.moving < 0.2 ? 0.12 : player.sprint ? 1.8 : 1;
-      const rate = (75 * f * mv * (player.crouch ? 0.45 : 1)) + (d < 2.6 ? 50 : 0);
+      const f = Math.pow(clamp(1 - d / DIFF.range, 0, 1), 0.7);
+      const mv = player.moving < 0.2 ? DIFF.still : player.sprint ? 1.8 : 1;
+      const rate = (DIFF.gain * f * mv * (player.crouch ? 0.5 : 1)) + (d < 2.6 ? 50 : 0);
       S.suspicion += rate * dt;
       S.sawPlayerT = 0.3;
       if (S.suspicion > 35 && canReact()) startInvestigate(player.x, player.z, 2.2);
     } else {
       S.sawPlayerT -= dt;
-      if (!S.invest) S.suspicion = Math.max(0, S.suspicion - dt * 6);
+      if (!S.invest) S.suspicion = Math.max(0, S.suspicion - dt * DIFF.decay);
     }
     if (S.suspicion >= 100) flee();
   }
@@ -1653,7 +1975,7 @@ function finishTask() {
   const t = S.task;
   if (t.type === 'present') {
     const away = new THREE.Vector3(S.pos.x - TREE.x, 0, S.pos.z - TREE.z).normalize();
-    const p = makePresent(TREE.x + away.x * 1.15 + rand(-0.2, 0.2), TREE.z + away.z * 1.15 + rand(-0.2, 0.2));
+    const p = t.spot ? makePresent(t.spot[0], t.spot[1]) : makePresent(TREE.x + away.x * 1.15 + rand(-0.2, 0.2), TREE.z + away.z * 1.15 + rand(-0.2, 0.2));
     p.userData.grow = 0;
     S.presentsLeft++;
     santa.sack.scale.setScalar(1 - S.presentsLeft / (TOTAL_PRESENTS + 2));
@@ -1668,6 +1990,7 @@ function finishTask() {
 function fleePath() {
   let { x, z } = S.pos; const p = [];
   if (x < -7.5) { if (x < -12.8) p.push([-13, 6.4]); p.push([-9, 6.4], [-5, 5.6], [3.5, 3.6]); z = 3.6; }
+  else if (z < -8) { p.push([2.7, -9.2], [2.7, -6.8], [3.2, -2.2]); z = -2.2; }
   else if (x < 3.2) {
     if (x > -1.3 && z > -2.1 && z < 2.1) p.push([x, z < 0 ? -2.2 : 2.4]); // get out from between the sofa and table
     p.push(z < 0 ? [3.2, -2.2] : [3.5, 3.6]);
@@ -1692,6 +2015,7 @@ function animateSanta(dt, time) {
   const r = santa.root;
   r.position.copy(S.pos);
   r.rotation.y = S.heading;
+  r.scale.setScalar(S.scale);
   santa.head.rotation.y = clamp(S.headYaw, -1.1, 1.1);
   let legSwing = 0, armL = 0, armR = 0, lean = 0, bob = 0;
   if (S.speed > 0) {
@@ -1739,12 +2063,12 @@ function spawnSparkles() {
 // ---------------------------------------------------------------------------
 function santaTarget() { return santa.chest.getWorldPosition(new THREE.Vector3()); }
 function photoCheck() {
-  if (!santa.root.visible || S.state === 'waiting' || (S.state === 'chimney' && S.rise > 0.45)) return { ok: false, why: 'Santa isn\'t in the shot!' };
+  if (!santa.root.visible || S.state === 'waiting' || (S.state === 'chimney' && S.pos.y > 0.6)) return { ok: false, why: 'Santa isn\'t in the shot!' };
   const tgt = santaTarget();
   const d = camera.position.distanceTo(tgt);
   const ndc = tgt.clone().project(camera);
-  if (ndc.z > 1 || Math.abs(ndc.x) > 0.6 || Math.abs(ndc.y) > 0.75) return { ok: false, why: 'Missed! Santa wasn\'t in the frame.' };
-  if (d > 10) return { ok: false, why: 'Too far away — the photo is just a blurry red smudge.', d };
+  if (ndc.z > 1 || Math.abs(ndc.x) > DIFF.frame || Math.abs(ndc.y) > DIFF.frame + 0.15) return { ok: false, why: 'Missed! Santa wasn\'t in the frame.' };
+  if (d > DIFF.photo) return { ok: false, why: 'Too far away — the photo is just a blurry red smudge.', d };
   if (!lineOfSight(camera.position.clone(), tgt) && !lineOfSight(camera.position.clone(), santa.head.getWorldPosition(new THREE.Vector3()))) return { ok: false, why: 'Something was in the way!', d };
   return { ok: true, d };
 }
@@ -1754,7 +2078,7 @@ function takePhoto() {
   if (game !== 'playing') return;
   if (film <= 0) { toast('Out of film! Run and hug him?', 1.6); tone(200, 0.15, 0.06, 'square'); return; }
   film--;
-  $('filmCount').textContent = '●'.repeat(film) + '○'.repeat(3 - film);
+  showFilm();
   sfxShutter();
   vibrate(35);
   const res = photoCheck();
@@ -1765,10 +2089,13 @@ function takePhoto() {
   flashT = 0.35; $('flash').style.opacity = 0.9;
   if (res.ok) { win(img, res.d, 'photo'); return; }
   toast(res.why + (film ? '' : ' (No film left!)'), 2.2);
+  disturbParents(40);
   // a camera flash in the dark is hard to miss
   if (santaPresent()) {
     const d = Math.hypot(S.pos.x - player.x, S.pos.z - player.z);
-    S.suspicion += 55 * Math.max(clamp(1 - d / 16, 0, 1), 0.5);
+    S.suspicion += DIFF.flash * Math.max(clamp(1 - d / 16, 0, 1), 0.5);
+    if (DIFF.flashFlee && (d < 12 || roomOf(player.x, player.z, player.floor) === roomOf(S.pos.x, S.pos.z))) S.suspicion = 100;
+    if (S.suspicion >= 100) { S.suspicion = 100; flee(); }
     if (canReact()) startInvestigate(player.x, player.z, 2.5);
   }
 }
@@ -1819,11 +2146,20 @@ function startGame(e) {
     if (window.innerHeight > window.innerWidth) setTimeout(() => toast('Tip: turn your phone sideways for a wider view', 3), 4200);
   } else lockPointer();
   // Santa lands in the fireplace
-  S.state = 'arrive'; S.timer = 2.2; S.pos.set(7.2, 3, 0);
+  S.state = 'arrive'; S.timer = 2.4; S.pos.set(7.55, 4.5, 0); S.scale = 0.42; santa.root.visible = false;
+  film = filmMax = DIFF.film; showFilm();
   sfxJingle(0.06); setTimeout(() => sfxJingle(0.05), 300);
   setTimeout(() => toast('<i>…jingle… jingle…</i> Someone\'s downstairs!', 3), 800);
 }
 $('startBtn').addEventListener('click', startGame);
+function pickDifficulty(k) {
+  diffKey = k; DIFF = DIFFS[k];
+  document.querySelectorAll('.dbtn').forEach((b) => b.classList.toggle('sel', b.dataset.d === k));
+  $('diffDesc').textContent = DIFF.desc;
+  try { localStorage.setItem('catchSantaDifficulty', k); } catch (e) { /* storage unavailable */ }
+}
+document.querySelectorAll('.dbtn').forEach((b) => b.addEventListener('click', () => pickDifficulty(b.dataset.d)));
+pickDifficulty(diffKey);
 if (isCoarse) $('startBtn').textContent = 'Tap to tiptoe downstairs';
 $('resumeBtn').addEventListener('click', () => setPaused(false));
 $('againBtn').addEventListener('click', () => location.reload());
@@ -1850,7 +2186,17 @@ function win(img, d, how) {
   $('endPhoto').innerHTML = `<div class="polaroid"><img src="${img}" alt="Your photo of Santa"><div class="cap">${caption}</div></div>`;
   $('endStars').textContent = '★'.repeat(stars) + '☆'.repeat(3 - stars);
   const tips = stars === 3 ? 'A perfect sneak — he never knew you were there.' : stars === 2 ? 'Nice shot! For 3 stars, get close while he\'s busy and unaware.' : 'Got him! For more stars, get closer and stay unseen.';
-  $('endText').innerHTML = `${tips}<br>Presents under the tree: <b>${S.presentsLeft}</b> 🎁`;
+  $('endText').innerHTML = `${tips}<br>Presents left: <b>${S.presentsLeft}</b> 🎁 · Difficulty: <b>${DIFF.label}</b>`;
+  endGame();
+}
+
+function loseParents() {
+  if (game !== 'playing') return;
+  say('What are you doing up? Back to bed!', 0.6, 1.0, 1);
+  $('endTitle').textContent = 'Dad woke up! 😴';
+  $('endPhoto').innerHTML = '';
+  $('endStars').textContent = '☆☆☆';
+  $('endText').innerHTML = 'You made too much noise in your parents\' room and got sent straight back to bed.<br>Crouch and tiptoe near sleeping grown-ups!';
   endGame();
 }
 
@@ -1870,12 +2216,13 @@ function lose() {
 // ---------------------------------------------------------------------------
 // Main loop
 // ---------------------------------------------------------------------------
-let last = performance.now(), time = 0, crackleT = 0, timeScale = 1, trainAngle = 0;
+let last = performance.now(), time = 0, crackleT = 0, timeScale = 1, trainAngle = 0, snoreT = 2;
 function loop(now) {
   const dt = Math.min(0.05, (now - last) / 1000) * timeScale; last = now; time += dt;
 
   if (game === 'playing') {
     updatePlayer(dt);
+    updateParents(dt);
     updateSanta(dt);
     // hugging Santa counts too
     if (santaPresent() && Math.hypot(S.pos.x - player.x, S.pos.z - player.z) < 0.95 && S.pos.y < 1) {
@@ -1898,6 +2245,14 @@ function loop(now) {
   trainAngle += dt * 0.32;
   train.forEach((g, i) => { const a = trainAngle - i * 0.24; g.position.set(TREE.x + Math.cos(a) * TRACK_R, 0.02, TREE.z + Math.sin(a) * TRACK_R); g.rotation.y = -a - Math.PI / 2; });
   catBody.scale.y = 0.6 + Math.sin(time * 1.8) * 0.03;
+  sleepers.forEach((l, i) => { l.scale.y = 0.35 + Math.sin(time * 1.1 + i * 2) * 0.03; });
+  filmMat.emissiveIntensity = 0.5 + Math.sin(time * 4) * 0.4;
+  if (actx && game === 'playing' && player.floor > 2 && (snoreT -= dt) <= 0) {
+    snoreT = 3.4;
+    const sd = Math.hypot(player.x - PB, player.z - 0.8);
+    const sv = clamp(1 - sd / 10, 0, 1) * (roomOf(player.x, player.z, player.floor) === 'parents' ? 1 : 0.35);
+    if (sv > 0.02) sfxSnore(sv * 0.5);
+  }
   star.rotation.y += dt * 0.4;
   pendulum.rotation.z = Math.sin(time * Math.PI) * 0.25;
   for (const sn of snowSystems) {
