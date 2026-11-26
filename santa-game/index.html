@@ -1,0 +1,2296 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Catch Santa!</title>
+<style>
+  :root {
+    --red: #d42a2f; --gold: #f2c14e; --cream: #fff6e6; --ink: #1a0f0a;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #05070d; font-family: Georgia, "Times New Roman", serif; color: var(--cream); }
+  canvas { display: block; touch-action: none; }
+  body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+  body.coarse .desk-only, body:not(.coarse) .touch-only { display: none !important; }
+
+  /* touch controls */
+  #touchUI { position: fixed; inset: 0; z-index: 6; }
+  #touchZone { position: absolute; inset: 0; touch-action: none; }
+  #stick { position: absolute; width: 120px; height: 120px; margin: -60px 0 0 -60px; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.35); background: rgba(255,255,255,0.08); pointer-events: none; opacity: 0.5; transition: opacity 0.15s; }
+  #stick.active { opacity: 1; }
+  #knob { position: absolute; left: 50%; top: 50%; width: 54px; height: 54px; margin: -27px 0 0 -27px; border-radius: 50%;
+    background: rgba(255,246,230,0.55); box-shadow: 0 2px 8px rgba(0,0,0,0.5); }
+  .tbtn { position: absolute; border-radius: 50%; border: 2px solid rgba(242,193,78,0.8); background: rgba(28,12,10,0.6);
+    color: var(--cream); font: bold 13px Georgia, serif; display: flex; align-items: center; justify-content: center; flex-direction: column;
+    touch-action: none; margin: 0; padding: 0; box-shadow: none; }
+  .tbtn.on { background: rgba(212,42,47,0.85); border-color: #fff; }
+  .tbtn:active { filter: brightness(1.3); }
+  #btnPhoto { width: 86px; height: 86px; right: calc(24px + env(safe-area-inset-right)); bottom: calc(28px + env(safe-area-inset-bottom)); font-size: 34px; background: rgba(212,42,47,0.75); }
+  #btnCrouch { width: 62px; height: 62px; right: calc(124px + env(safe-area-inset-right)); bottom: calc(24px + env(safe-area-inset-bottom)); }
+  #btnRun { width: 62px; height: 62px; right: calc(40px + env(safe-area-inset-right)); bottom: calc(128px + env(safe-area-inset-bottom)); }
+  #btnPause { width: 42px; height: 42px; left: 50%; margin-left: -21px; top: calc(10px + env(safe-area-inset-top)); font-size: 15px; }
+  .tbtn small { font-size: 18px; line-height: 1; }
+  .overlay {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(ellipse at center, rgba(10,14,30,0.55), rgba(0,0,0,0.85));
+    backdrop-filter: blur(3px); z-index: 10;
+    padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+  }
+  .hidden { display: none !important; }
+  .card {
+    max-width: 640px; width: 100%; max-height: 100%; background: rgba(28,12,10,0.88); border: 2px solid var(--gold);
+    border-radius: 14px; padding: 28px 32px; box-shadow: 0 0 60px rgba(242,193,78,0.25); text-align: center;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  /* the text scrolls if space is tight; the button underneath is always visible */
+  .card-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
+  .card-foot { flex: none; }
+  .diff { margin-top: 12px; font-size: 15px; }
+  .dbtn { margin: 0 3px; padding: 5px 14px; font-size: 14px; border-radius: 20px; background: transparent; box-shadow: none; border: 2px solid var(--gold); color: var(--cream); }
+  .dbtn.sel { background: var(--red); }
+  #diffDesc { margin-top: 6px; min-height: 1.2em; }
+  .card-foot button { margin-top: 10px; }
+  h1 { margin: 0 0 6px; font-size: 44px; color: var(--gold); letter-spacing: 1px; text-shadow: 0 2px 0 #7a1010; }
+  h2 { margin: 0 0 10px; color: var(--gold); }
+  .sub { font-style: italic; opacity: 0.85; margin-bottom: 16px; }
+  .story { text-align: left; line-height: 1.5; font-size: 16px; }
+  .controls { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; text-align: left; margin: 16px auto; font-size: 15px; max-width: 420px; }
+  .controls b { color: var(--gold); font-family: monospace; font-size: 14px; }
+  button {
+    margin-top: 14px; font: bold 20px Georgia, serif; padding: 12px 34px; border-radius: 40px; cursor: pointer;
+    border: 2px solid var(--gold); background: var(--red); color: white; box-shadow: 0 4px 0 #6d0e0e;
+  }
+  button:hover { filter: brightness(1.15); }
+  .tip { font-size: 14px; opacity: 0.8; margin-top: 10px; }
+
+  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
+  #objective { position: absolute; top: 16px; left: 16px; font-size: 16px; background: rgba(0,0,0,0.45); padding: 8px 12px; border-radius: 8px; max-width: 60vw; }
+  #film { position: absolute; top: 16px; right: 16px; font-size: 18px; background: rgba(0,0,0,0.45); padding: 8px 12px; border-radius: 8px; }
+  #meters { position: absolute; bottom: 18px; left: 16px; width: 230px; font-size: 13px; background: rgba(0,0,0,0.45); padding: 10px 12px; border-radius: 8px; }
+  .bar { height: 10px; background: rgba(255,255,255,0.15); border-radius: 5px; overflow: hidden; margin: 3px 0 8px; }
+  .bar > div { height: 100%; width: 0%; transition: width 0.1s linear; }
+  #noiseFill { background: linear-gradient(90deg, #6fd36f, #f2c14e, #e0402a); }
+  #susFill { background: linear-gradient(90deg, #f2c14e, #e0402a); }
+  #status { position: absolute; bottom: 18px; right: 16px; font-size: 14px; background: rgba(0,0,0,0.45); padding: 8px 12px; border-radius: 8px; text-align: right; }
+  #toast { position: absolute; bottom: 90px; left: 50%; transform: translateX(-50%); font-size: 20px; text-align: center; text-shadow: 0 2px 4px #000; opacity: 0; transition: opacity 0.3s; max-width: 90vw; }
+  #warn { position: absolute; top: 22%; left: 50%; transform: translateX(-50%); font-size: 30px; font-weight: bold; color: #ffdf6e; text-shadow: 0 0 12px #000, 0 2px 3px #000; opacity: 0; transition: opacity 0.2s; }
+  #viewfinder { position: absolute; left: 50%; top: 50%; width: 46vmin; height: 34vmin; transform: translate(-50%,-50%); }
+  #viewfinder i { position: absolute; width: 28px; height: 28px; border-color: rgba(255,255,255,0.55); border-style: solid; transition: border-color 0.15s; }
+  #viewfinder i:nth-child(1) { left: 0; top: 0; border-width: 2px 0 0 2px; }
+  #viewfinder i:nth-child(2) { right: 0; top: 0; border-width: 2px 2px 0 0; }
+  #viewfinder i:nth-child(3) { left: 0; bottom: 0; border-width: 0 0 2px 2px; }
+  #viewfinder i:nth-child(4) { right: 0; bottom: 0; border-width: 0 2px 2px 0; }
+  #viewfinder.lock i { border-color: #7dff8a; }
+  #dot { position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px; border-radius: 50%; background: rgba(255,255,255,0.7); }
+  #flash { position: fixed; inset: 0; background: white; opacity: 0; pointer-events: none; z-index: 8; }
+  #vignette { position: fixed; inset: 0; pointer-events: none; z-index: 4; background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.6)); }
+
+  .polaroid { background: #fbf8f0; padding: 14px 14px 18px; display: inline-block; transform: rotate(-2.5deg); box-shadow: 0 10px 30px rgba(0,0,0,0.6); margin: 10px 0 6px; max-width: 100%; }
+  .polaroid img { display: block; width: 100%; max-width: min(480px, 50vh); aspect-ratio: 4/3; object-fit: cover; filter: sepia(0.15) contrast(1.05); }
+  .polaroid .cap { color: #333; font: italic 20px "Comic Sans MS", "Bradley Hand", cursive; margin-top: 10px; }
+  .stars { font-size: 34px; color: var(--gold); letter-spacing: 6px; }
+
+  /* compact HUD for phones */
+  body.touch #objective { top: calc(10px + env(safe-area-inset-top)); left: calc(10px + env(safe-area-inset-left)); font-size: 12px; padding: 5px 8px; max-width: 34vw; }
+  body.touch #film { top: calc(10px + env(safe-area-inset-top)); right: calc(10px + env(safe-area-inset-right)); font-size: 13px; padding: 5px 8px; }
+  body.touch #meters { top: auto; bottom: auto; top: calc(62px + env(safe-area-inset-top)); left: calc(10px + env(safe-area-inset-left)); width: 150px; font-size: 11px; padding: 6px 8px; }
+  body.touch .bar { height: 7px; margin: 2px 0 5px; }
+  body.touch #status { bottom: auto; top: calc(48px + env(safe-area-inset-top)); right: calc(10px + env(safe-area-inset-right)); font-size: 11px; padding: 5px 8px; max-width: 40vw; }
+  body.touch #toast { bottom: auto; top: 62%; font-size: 15px; max-width: 60vw; }
+  body.touch #warn { font-size: 20px; top: 26%; width: 80vw; text-align: center; }
+  @media (max-width: 700px), (max-height: 520px) {
+    .card { padding: 16px 18px; }
+    h1 { font-size: 30px; }
+    .story { font-size: 14px; }
+    .controls { font-size: 13px; margin: 10px auto; }
+    button { font-size: 17px; padding: 10px 26px; margin-top: 10px; }
+    .stars { font-size: 26px; }
+  }
+  @media (orientation: landscape) { #rotateTip { display: none !important; } }
+  @media (max-height: 400px) {
+    .card { padding: 10px 14px; }
+    h1 { font-size: 22px !important; }
+    .sub { display: none; }
+    .card-foot button { margin-top: 6px; padding: 8px 24px; font-size: 16px; }
+  }
+  @media (max-height: 520px) {
+    h1 { font-size: 26px; margin: 0; }
+    .sub { margin-bottom: 6px; font-size: 13px; }
+    .story { font-size: 13px; line-height: 1.35; }
+    .story br { display: none; }
+    .controls { grid-template-columns: auto 1fr auto 1fr; max-width: 640px; gap: 3px 10px; font-size: 12px; margin: 8px auto; }
+    .controls b { font-size: 12px; }
+    .tip { font-size: 12px; margin-top: 6px; }
+    button { margin-top: 6px; }
+  }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div id="vignette"></div>
+<div id="hud" class="hidden">
+  <div id="objective">Sneak downstairs and snap a photo of Santa!</div>
+  <div id="film">📷 Film: <span id="filmCount">●●●</span></div>
+  <div id="meters">
+    Your noise<div class="bar"><div id="noiseFill"></div></div>
+    Santa's suspicion<div class="bar"><div id="susFill"></div></div>
+  </div>
+  <div id="status">🎁 Presents left: <span id="presentCount">0</span><br><span id="santaDoing">Santa is coming down the chimney…</span></div>
+  <div id="viewfinder"><i></i><i></i><i></i><i></i></div>
+  <div id="dot"></div>
+  <div id="warn"></div>
+  <div id="toast"></div>
+</div>
+<div id="flash"></div>
+<div id="touchUI" class="hidden">
+  <div id="touchZone"></div>
+  <div id="stick"><div id="knob"></div></div>
+  <button class="tbtn" id="btnPhoto" aria-label="Take photo">📷</button>
+  <button class="tbtn" id="btnCrouch" aria-label="Crouch"><small>🧎</small>Crouch</button>
+  <button class="tbtn" id="btnRun" aria-label="Run"><small>🏃</small>Run</button>
+  <button class="tbtn" id="btnPause" aria-label="Pause">❚❚</button>
+</div>
+
+<div id="intro" class="overlay">
+  <div class="card">
+    <div class="card-body">
+    <h1>🎅 Catch Santa! 🎄</h1>
+    <div class="sub">Christmas morning, 3:07 a.m.</div>
+    <div class="story">
+      You wake up in your bedroom to a faint <i>jingle</i> and the crackle of a fire. Someone is downstairs.
+      Grab your camera, creep down the stairs, and get a photo of <b>Santa Claus</b> before he goes back up the chimney.
+      He wanders all over the house: the tree, the study, the kitchen, the stockings.
+      <br><br>Your parents are asleep down the hall. Don't wake them! Dad keeps a spare roll of film in his camera bag.
+      <br><br>
+      If he hears or sees you, he'll be gone in a flash. Grandpa always said <b>the 4th and 9th steps creak in the middle</b>.
+      Keep to the edges.
+    </div>
+    <div class="controls touch-only">
+      <b>Left thumb</b><span>Drag anywhere on the left to walk</span>
+      <b>Right thumb</b><span>Drag on the right to look around</span>
+      <b>📷</b><span>Take a photo (3 shots of film)</span>
+      <b>Crouch</b><span>Tiptoe quietly (tap to toggle)</span>
+      <b>Run</b><span>Fast but loud! (tap to toggle)</span>
+      <b>❚❚</b><span>Pause</span>
+    </div>
+    <div class="tip touch-only" id="rotateTip" style="margin-top:0">Turn your phone sideways for the best view.</div>
+    <div class="controls desk-only">
+      <b>Mouse</b><span>Look around</span>
+      <b>W A S D</b><span>Move</span>
+      <b>Hold C</b><span>Crouch & tiptoe (quiet)</span>
+      <b>Hold Shift</b><span>Run (loud!)</span>
+      <b>Click / Space</b><span>Take a photo (3 shots of film)</span>
+      <b>Esc</b><span>Pause</span>
+    </div>
+    <div class="diff">Difficulty:
+      <button class="dbtn" data-d="easy">Easy</button><button class="dbtn" data-d="normal">Normal</button><button class="dbtn" data-d="hard">Hard</button>
+    </div>
+    <div class="tip" id="diffDesc"></div>
+    <div class="tip">Tip: when Santa turns around, freeze and crouch. Shots from close range score higher.</div>
+    </div>
+    <div class="card-foot"><button id="startBtn">Tiptoe downstairs</button></div>
+  </div>
+</div>
+
+<div id="pause" class="overlay hidden">
+  <div class="card"><div class="card-body"><h2>Paused</h2><div>Shh… Santa hasn't noticed a thing.</div></div><div class="card-foot"><button id="resumeBtn">Resume</button></div></div>
+</div>
+
+<div id="end" class="overlay hidden">
+  <div class="card">
+    <div class="card-body">
+    <h1 id="endTitle"></h1>
+    <div id="endPhoto"></div>
+    <div id="endStars" class="stars"></div>
+    <div id="endText" class="story" style="text-align:center"></div>
+    </div>
+    <div class="card-foot"><button id="againBtn">Play again</button></div>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+
+// ---------------------------------------------------------------------------
+// Basics
+// ---------------------------------------------------------------------------
+const $ = (id) => document.getElementById(id);
+const rand = (a, b) => a + Math.random() * (b - a);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const angleDiff = (a, b) => { let d = b - a; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return d; };
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+const isCoarse = window.matchMedia('(pointer: coarse)').matches;
+if (isCoarse) document.body.classList.add('coarse');
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, isCoarse ? 1.5 : 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.15;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x05070d);
+const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.05, 120);
+camera.rotation.order = 'YXZ';
+
+// keep a sensible horizontal field of view on tall (portrait) screens
+function fitCamera() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.fov = camera.aspect >= 1 ? 70 : clamp(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(36)) / camera.aspect) * 180 / Math.PI, 70, 100);
+}
+fitCamera();
+window.addEventListener('resize', () => {
+  fitCamera();
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+function canvasTex(w, h, draw, repeat) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  draw(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 8;
+  if (repeat) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(repeat[0], repeat[1]); }
+  return t;
+}
+
+const occluders = []; // things that block line of sight (for Santa's eyes and your camera)
+function addMesh(geo, mat, x, y, z, { occ = false, parent = scene } = {}) {
+  const m = new THREE.Mesh(geo, mat);
+  m.position.set(x, y, z);
+  parent.add(m);
+  if (occ) occluders.push(m);
+  return m;
+}
+const box = (w, h, d, mat, x, y, z, opts) => addMesh(new THREE.BoxGeometry(w, h, d), mat, x, y, z, opts);
+const stdCache = new Map(); // share identical materials so static meshes can be merged
+const std = (color, extra = {}) => {
+  const key = color + JSON.stringify(extra);
+  if (!stdCache.has(key)) stdCache.set(key, new THREE.MeshStandardMaterial({ color, roughness: 0.85, ...extra }));
+  return stdCache.get(key);
+};
+
+// ---------------------------------------------------------------------------
+// Textures
+// ---------------------------------------------------------------------------
+function planks(g, w, h) {
+  const rows = 8;
+  for (let r = 0; r < rows; r++) {
+    let x = -rand(0, 200);
+    while (x < w) {
+      const len = rand(170, 320);
+      g.fillStyle = `hsl(${rand(22, 30)},${rand(40, 50)}%,${rand(26, 36)}%)`;
+      g.fillRect(x, r * h / rows, len, h / rows);
+      for (let i = 0; i < 7; i++) {
+        g.strokeStyle = 'rgba(50,25,8,0.25)'; g.lineWidth = 1; g.beginPath();
+        const yy = r * h / rows + rand(3, h / rows - 3);
+        g.moveTo(x, yy); g.bezierCurveTo(x + len * 0.3, yy + rand(-3, 3), x + len * 0.6, yy + rand(-3, 3), x + len, yy); g.stroke();
+      }
+      g.strokeStyle = 'rgba(0,0,0,0.55)'; g.lineWidth = 2; g.strokeRect(x, r * h / rows, len, h / rows);
+      x += len;
+    }
+  }
+}
+const floorTex = canvasTex(512, 512, planks, [4, 4]);
+const stairTex = canvasTex(512, 512, planks, [1, 0.3]);
+
+const wallTex = canvasTex(256, 256, (g, w, h) => {
+  g.fillStyle = '#5b1c22'; g.fillRect(0, 0, w, h);
+  for (let x = 0; x < w; x += 64) { g.fillStyle = 'rgba(255,210,140,0.07)'; g.fillRect(x, 0, 24, h); }
+  g.fillStyle = 'rgba(242,193,78,0.22)';
+  for (let y = 16; y < h; y += 64) for (let x = 44; x < w; x += 64) {
+    g.beginPath(); g.moveTo(x, y - 7); g.lineTo(x + 6, y); g.lineTo(x, y + 7); g.lineTo(x - 6, y); g.fill();
+  }
+}, [8, 3]);
+
+const brickTex = canvasTex(256, 256, (g, w, h) => {
+  g.fillStyle = '#4a3a33'; g.fillRect(0, 0, w, h);
+  const bh = 32, bw = 64;
+  for (let r = 0; r < h / bh; r++) for (let c = -1; c < w / bw + 1; c++) {
+    g.fillStyle = `hsl(${rand(5, 15)},${rand(40, 55)}%,${rand(25, 36)}%)`;
+    g.fillRect(c * bw + (r % 2) * bw / 2 + 2, r * bh + 2, bw - 4, bh - 4);
+  }
+}, [2, 3]);
+
+const rugTex = canvasTex(512, 512, (g, w, h) => {
+  const cx = w / 2;
+  const rings = ['#6e1219', '#d9b35b', '#1f4a33', '#8c1b23', '#e7d6b0', '#6e1219'];
+  rings.forEach((col, i) => { g.fillStyle = col; g.beginPath(); g.arc(cx, cx, cx - i * 38, 0, Math.PI * 2); g.fill(); });
+  g.strokeStyle = 'rgba(242,193,78,0.6)'; g.lineWidth = 6;
+  for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2; g.beginPath(); g.moveTo(cx + Math.cos(a) * 40, cx + Math.sin(a) * 40); g.lineTo(cx + Math.cos(a) * 140, cx + Math.sin(a) * 140); g.stroke(); }
+});
+
+const skyTex = canvasTex(1024, 512, (g, w, h) => {
+  const grd = g.createLinearGradient(0, 0, 0, h);
+  grd.addColorStop(0, '#02040c'); grd.addColorStop(0.6, '#13204a'); grd.addColorStop(1, '#2c3c6e');
+  g.fillStyle = grd; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 260; i++) { g.fillStyle = `rgba(255,255,255,${rand(0.3, 1)})`; g.fillRect(rand(0, w), rand(0, h * 0.6), rand(1, 2.5), rand(1, 2.5)); }
+  g.fillStyle = '#fffbe8'; g.shadowColor = '#cfe0ff'; g.shadowBlur = 40; g.beginPath(); g.arc(w * 0.72, h * 0.18, 34, 0, Math.PI * 2); g.fill(); g.shadowBlur = 0;
+  // houses with warm windows
+  for (let i = 0; i < 7; i++) {
+    const x = i * 150 + rand(-20, 20), bw = rand(90, 130), bh = rand(60, 100), y = h * 0.78 - bh;
+    g.fillStyle = '#0b1022'; g.fillRect(x, y, bw, bh + 40);
+    g.beginPath(); g.moveTo(x - 10, y); g.lineTo(x + bw / 2, y - 45); g.lineTo(x + bw + 10, y); g.fill();
+    g.fillStyle = '#e8f0ff'; g.beginPath(); g.moveTo(x - 10, y); g.lineTo(x + bw / 2, y - 45); g.lineTo(x + bw + 10, y); g.lineTo(x + bw / 2, y - 36); g.fill();
+    g.fillStyle = '#ffc861';
+    for (let k = 0; k < 3; k++) if (Math.random() < 0.6) g.fillRect(x + 12 + k * 30, y + 20, 16, 18);
+  }
+  g.fillStyle = '#dfe8fb'; g.beginPath(); g.moveTo(0, h * 0.8);
+  for (let x = 0; x <= w; x += 40) g.lineTo(x, h * 0.8 + Math.sin(x * 0.01) * 10);
+  g.lineTo(w, h); g.lineTo(0, h); g.fill();
+});
+
+// ---------------------------------------------------------------------------
+// House
+// ---------------------------------------------------------------------------
+// Layout (metres):
+//   Living room     x ∈ [-8, 8],  z ∈ [-8, 8],  floor 0, ceiling 6 (open stairwell)
+//   Landing         x ∈ [-8,-4],  z ∈ [-8,-5],  floor 3; stairs x ∈ [-8,-6], z from -5 (top) to 3 (bottom)
+//   Bedroom         x ∈ [-9,-3],  z ∈ [-14,-8], floor 3, ceiling 6 (door in the living room's back wall)
+//   Kitchen/dining  x ∈ [-17,-8], z ∈ [-1, 8],  floor 0, ceiling 3.2 (archway in the living room's left wall)
+const LANDING_Y = 3, STEP_COUNT = 12, STEP_D = 8 / STEP_COUNT, STEP_H = LANDING_Y / STEP_COUNT;
+const CREAKY = [3, 8]; // 4th and 9th steps
+const W = { occ: true };
+const markDynamic = (o) => { o.userData.dynamic = true; return o; };
+
+// more textures
+const bedWallTex = canvasTex(256, 256, (g, w, h) => {
+  g.fillStyle = '#1d2a55'; g.fillRect(0, 0, w, h);
+  g.fillStyle = 'rgba(255,230,150,0.75)';
+  for (let i = 0; i < 14; i++) {
+    const x = rand(10, w - 10), y = rand(10, h - 10), r = rand(4, 8);
+    g.beginPath();
+    for (let k = 0; k < 10; k++) { const a = k / 10 * Math.PI * 2 - Math.PI / 2, rr = k % 2 ? r * 0.45 : r; k ? g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr) : g.moveTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); }
+    g.fill();
+  }
+  g.fillStyle = 'rgba(255,240,200,0.8)'; g.beginPath(); g.arc(180, 70, 14, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#1d2a55'; g.beginPath(); g.arc(186, 66, 12, 0, Math.PI * 2); g.fill();
+});
+const carpetTex = canvasTex(256, 256, (g, w, h) => {
+  g.fillStyle = '#3a5a8c'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 4000; i++) { g.fillStyle = `rgba(${Math.random() < 0.5 ? '255,255,255' : '0,0,0'},0.06)`; g.fillRect(rand(0, w), rand(0, h), 2, 2); }
+});
+const kitFloorTex = canvasTex(256, 256, (g, w, h) => {
+  for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) { g.fillStyle = (x + y) % 2 ? '#2a4a3a' : '#e9e2cf'; g.fillRect(x * 64, y * 64, 64, 64); }
+  g.strokeStyle = 'rgba(0,0,0,0.25)'; g.lineWidth = 2; for (let i = 0; i <= 4; i++) { g.beginPath(); g.moveTo(i * 64, 0); g.lineTo(i * 64, h); g.moveTo(0, i * 64); g.lineTo(w, i * 64); g.stroke(); }
+});
+const kitWallTex = canvasTex(256, 256, (g, w, h) => {
+  g.fillStyle = '#d8d0b0'; g.fillRect(0, 0, w, h);
+  for (let x = 0; x < w; x += 32) { g.fillStyle = 'rgba(80,120,80,0.18)'; g.fillRect(x, 0, 6, h); }
+  g.fillStyle = 'rgba(180,40,40,0.25)'; for (let y = 24; y < h; y += 64) for (let x = 16; x < w; x += 32) { g.beginPath(); g.arc(x + 3, y, 3, 0, Math.PI * 2); g.fill(); }
+});
+const tileTex = canvasTex(128, 128, (g, w, h) => {
+  g.fillStyle = '#9aa7a0'; g.fillRect(0, 0, w, h);
+  for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) { g.fillStyle = `hsl(150,${rand(8, 14)}%,${rand(82, 90)}%)`; g.fillRect(x * 32 + 2, y * 32 + 2, 28, 28); }
+});
+function textTex(w, h, draw) { return canvasTex(w, h, draw); }
+
+// Materials whose texture repeats with the size of the surface
+const tiledCache = new Map();
+function tiled(tex, w, h, tile = 2, extra = {}) {
+  const key = `${tex.uuid}:${w.toFixed(2)}x${h.toFixed(2)}:${tile}`;
+  if (!tiledCache.has(key)) {
+    const t = tex.clone(); t.needsUpdate = true;
+    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(Math.max(0.05, w / tile), Math.max(0.05, h / tile));
+    const m = new THREE.MeshStandardMaterial({ map: t, roughness: 0.9, ...extra });
+    // when static meshes are merged, the repeat is baked into the UVs and all sizes share one material
+    const baseKey = tex.uuid + JSON.stringify(extra);
+    if (!tiledCache.has(baseKey)) { const bt = tex.clone(); bt.needsUpdate = true; bt.wrapS = bt.wrapT = THREE.RepeatWrapping; bt.repeat.set(1, 1); tiledCache.set(baseKey, new THREE.MeshStandardMaterial({ map: bt, roughness: 0.9, ...extra })); }
+    m.userData.tiledBase = tiledCache.get(baseKey);
+    tiledCache.set(key, m);
+  }
+  return tiledCache.get(key);
+}
+// A wall on the plane x = c (axis 'x') or z = c (axis 'z'), spanning a0..a1 along the wall, with rectangular holes
+function wall(axis, c, a0, a1, y0, y1, holes, tex, { t = 0.2, tile = 2, occ = true } = {}) {
+  const piece = (b0, b1, h0, h1) => {
+    if (b1 - b0 < 0.01 || h1 - h0 < 0.01) return;
+    const len = b1 - b0, h = h1 - h0, mat = tiled(tex, len, h, tile);
+    if (axis === 'x') box(t, h, len, mat, c, (h0 + h1) / 2, (b0 + b1) / 2, { occ });
+    else box(len, h, t, mat, (b0 + b1) / 2, (h0 + h1) / 2, c, { occ });
+  };
+  let cur = a0;
+  for (const o of [...holes].sort((p, q) => p.a0 - q.a0)) { piece(cur, o.a0, y0, y1); piece(o.a0, o.a1, y0, o.y0); piece(o.a0, o.a1, o.y1, y1); cur = o.a1; }
+  piece(cur, a1, y0, y1);
+}
+function floorPlane(x0, x1, z0, z1, y, tex, tile) {
+  const m = addMesh(new THREE.PlaneGeometry(x1 - x0, z1 - z0), tiled(tex, x1 - x0, z1 - z0, tile, { roughness: 0.75 }), (x0 + x1) / 2, y, (z0 + z1) / 2);
+  m.rotation.x = -Math.PI / 2; return m;
+}
+function ceilPlane(x0, x1, z0, z1, y, color) {
+  const m = addMesh(new THREE.PlaneGeometry(x1 - x0, z1 - z0), std(color), (x0 + x1) / 2, y, (z0 + z1) / 2);
+  m.rotation.x = Math.PI / 2; return m;
+}
+
+const wallMat = new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.9 });
+const trimMat = std(0xe9e1cf, { roughness: 0.6 });
+const darkWood = std(0x4a2a17, { roughness: 0.6 });
+const lightWood = std(0x9a6a3a, { roughness: 0.7 });
+const frameMat = std(0xf2ede2, { roughness: 0.5 });
+const skyMat = new THREE.MeshBasicMaterial({ map: skyTex });
+const snowGroundMat = std(0xb8c8ec, { roughness: 1 });
+
+// Falling snow outside each window
+const snowSystems = [];
+function makeSnow(x0, x1, y0, y1, z0, z1, n) {
+  const g = new THREE.BufferGeometry(), p = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) { p[i * 3] = rand(x0, x1); p[i * 3 + 1] = rand(y0, y1); p[i * 3 + 2] = rand(z0, z1); }
+  g.setAttribute('position', new THREE.BufferAttribute(p, 3));
+  const pts = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, size: 0.06, transparent: true, opacity: 0.9 }));
+  scene.add(pts);
+  snowSystems.push({ pts, y0, y1, n });
+}
+
+// box placed relative to a wall: a = along the wall, n = offset from the wall's centre plane (positive = outside)
+function wbox(axis, c, out, wAlong, h, thick, a, y, n, mat) {
+  return axis === 'z' ? box(wAlong, h, thick, mat, a, y, c + out * n) : box(thick, h, wAlong, mat, c + out * n, y, a);
+}
+let windowCount = 0;
+function addWindow(axis, c, out, a0, a1, y0, y1, { curtains = 0x1d4a2e, minY = 0 } = {}) {
+  const back = 4.2 + (windowCount++) * 0.07;
+  const am = (a0 + a1) / 2, ym = (y0 + y1) / 2, wA = a1 - a0, h = y1 - y0;
+  wbox(axis, c, out, wA + 0.2, 0.12, 0.3, am, y0, -0.1, frameMat);
+  wbox(axis, c, out, wA + 0.2, 0.12, 0.3, am, y1, -0.1, frameMat);
+  wbox(axis, c, out, 0.12, h + 0.1, 0.3, a0, ym, -0.1, frameMat);
+  wbox(axis, c, out, 0.12, h + 0.1, 0.3, a1, ym, -0.1, frameMat);
+  wbox(axis, c, out, 0.06, h, 0.08, am, ym, -0.05, frameMat);
+  wbox(axis, c, out, wA, 0.06, 0.08, am, ym, -0.05, frameMat);
+  wbox(axis, c, out, wA + 0.4, 0.08, 0.45, am, y0 - 0.05, -0.25, frameMat);
+  const rotY = axis === 'z' ? (out > 0 ? Math.PI : 0) : (out > 0 ? -Math.PI / 2 : Math.PI / 2);
+  const at = (a, y, n) => axis === 'z' ? [a, y, c + out * n] : [c + out * n, y, a];
+  const glass = addMesh(new THREE.PlaneGeometry(wA, h), new THREE.MeshBasicMaterial({ color: 0x9fb8ff, transparent: true, opacity: 0.08, side: THREE.DoubleSide, depthWrite: false }), ...at(am, ym, 0));
+  glass.rotation.y = rotY;
+  if (curtains) {
+    const cm = std(curtains, { roughness: 1 });
+    wbox(axis, c, out, 0.7, h + 1.2, 0.12, a0 - 0.45, ym + 0.2, -0.22, cm);
+    wbox(axis, c, out, 0.7, h + 1.2, 0.12, a1 + 0.45, ym + 0.2, -0.22, cm);
+    wbox(axis, c, out, wA + 1.8, 0.07, 0.07, am, ym + h / 2 + 0.75, -0.25, darkWood);
+  } else {
+    wbox(axis, c, out, wA + 0.3, 0.25, 0.1, am, y1 + 0.12, -0.2, std(0xb03030, { roughness: 1 })); // valance
+  }
+  // the view outside
+  const sky = addMesh(new THREE.PlaneGeometry(wA * 5, 10), skyMat, ...at(am, ym + 1, back));
+  sky.rotation.y = rotY;
+  const gw = axis === 'z' ? wA * 5 : 4, gd = axis === 'z' ? 4 : wA * 5;
+  const ground = addMesh(new THREE.PlaneGeometry(gw, gd), snowGroundMat, ...at(am, -0.05, 2.2));
+  ground.rotation.x = -Math.PI / 2;
+  const n0 = c + out * 0.3, n1 = c + out * 3.8;
+  const [s0, s1] = [Math.min(n0, n1), Math.max(n0, n1)];
+  if (axis === 'z') makeSnow(a0 - 1.5, a1 + 1.5, Math.max(minY, y0 - 2), y1 + 2.5, s0, s1, 240);
+  else makeSnow(s0, s1, Math.max(minY, y0 - 2), y1 + 2.5, a0 - 1.5, a1 + 1.5, 240);
+}
+
+// Instanced books and fairy lights (cheap to draw)
+const bookItems = [];
+function shelfBooks(x0, x1, y, z, depth) {
+  let x = x0;
+  while (x < x1 - 0.06) {
+    if (Math.random() < 0.07) { x += rand(0.1, 0.25); continue; }
+    const w = rand(0.035, 0.09), h = rand(0.2, 0.33);
+    bookItems.push({ x: x + w / 2, y: y + h / 2, z, w, h, d: depth * rand(0.75, 0.95), color: new THREE.Color().setHSL(rand(0, 1), rand(0.3, 0.6), rand(0.2, 0.45)) });
+    x += w + 0.004;
+  }
+}
+function shelfBooksZ(z0, z1, y, x, depth) {
+  let z = z0;
+  while (z < z1 - 0.06) {
+    if (Math.random() < 0.07) { z += rand(0.1, 0.25); continue; }
+    const w = rand(0.035, 0.09), h = rand(0.2, 0.33);
+    bookItems.push({ x, y: y + h / 2, z: z + w / 2, w: depth * rand(0.75, 0.95), h, d: w, color: new THREE.Color().setHSL(rand(0, 1), rand(0.3, 0.6), rand(0.2, 0.45)) });
+    z += w + 0.004;
+  }
+}
+const fairyItems = [];
+function fairyLights(x0, z0, x1, z1, y, n, sag = 0.18) {
+  const cols = [0xff4040, 0xffd24a, 0x4aa0ff, 0x5aff7a, 0xff7ae0];
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    fairyItems.push({ x: lerp(x0, x1, t), y: y - Math.sin(t * Math.PI) * sag, z: lerp(z0, z1, t), color: new THREE.Color(cols[i % cols.length]) });
+  }
+}
+
+// ===================== LIVING ROOM =====================
+floorPlane(-8, 8, -8, 8, 0, floorTex, 4);
+ceilPlane(-8, 8, -8, 8, 6, 0xcfc6b8);
+wall('z', -8.1, -8.2, 8.2, 0, 6, [{ a0: -6.2, a1: -5.0, y0: 3, y1: 5.2 }, { a0: 2.1, a1: 3.3, y0: 0, y1: 2.3 }], wallTex); // back (bedroom & study doors)
+wall('z', 8.1, -8.2, 8.2, 0, 6, [{ a0: -1, a1: 3, y0: 1.2, y1: 4.2 }], wallTex);         // front (window)
+wall('x', -8.1, -8.2, 8.2, 0, 6, [{ a0: 4, a1: 7.5, y0: 0, y1: 2.8 }, { a0: -7.2, a1: -5.9, y0: 3, y1: 5.2 }], wallTex); // left (kitchen archway, upstairs hallway)
+wall('x', 8.1, -8.2, 8.2, 0, 6, [{ a0: 3.5, a1: 6.5, y0: 1.2, y1: 4.2 }], wallTex);      // right (window)
+// baseboards & crown moulding
+box(10.1, 0.18, 0.05, trimMat, -2.95, 0.09, -7.98); box(4.7, 0.18, 0.05, trimMat, 5.65, 0.09, -7.98); box(16, 0.18, 0.05, trimMat, 0, 0.09, 7.98);
+box(0.05, 0.18, 16, trimMat, 7.98, 0.09, 0);
+box(0.05, 0.18, 12, trimMat, -7.98, 0.09, -2); box(0.05, 0.18, 0.5, trimMat, -7.98, 0.09, 7.75);
+box(16, 0.2, 0.08, trimMat, 0, 5.9, -7.96); box(16, 0.2, 0.08, trimMat, 0, 5.9, 7.96);
+box(0.08, 0.2, 16, trimMat, 7.96, 5.9, 0); box(0.08, 0.2, 16, trimMat, -7.96, 5.9, 0);
+// wainscoting rail
+box(16, 0.06, 0.05, trimMat, 0, 1.0, 7.97); box(0.05, 0.06, 16, trimMat, 7.97, 1.0, 0);
+// exposed ceiling beams
+for (const z of [-4.5, -0.5, 3.5]) box(16, 0.28, 0.3, darkWood, 0, 5.86, z);
+
+addWindow('z', 8.1, 1, -1, 3, 1.2, 4.2);
+addWindow('x', 8.1, 1, 3.5, 6.5, 1.2, 4.2);
+// wreath above the front window
+addMesh(new THREE.TorusGeometry(0.35, 0.12, 10, 24), std(0x1f5a2a), 1, 4.85, 7.95);
+for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2; addMesh(new THREE.SphereGeometry(0.04, 8, 8), std(0xd42a2f, { emissive: 0x550000 }), 1 + Math.cos(a) * 0.35, 4.85 + Math.sin(a) * 0.35, 7.88); }
+addMesh(new THREE.TorusGeometry(0.08, 0.03, 8, 12), std(0xc41e24), 1, 4.5, 7.86);
+
+// --- Landing (upstairs) ---
+box(4, LANDING_Y, 3, wallMat, -6, LANDING_Y / 2, -6.5, W);
+box(4, 0.08, 3, new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.75 }), -6, LANDING_Y - 0.02, -6.5);
+box(2.04, 0.2, 0.06, trimMat, -5, LANDING_Y - 0.1, -4.98);
+box(0.06, 0.2, 3.04, trimMat, -3.98, LANDING_Y - 0.1, -6.5);
+box(1.0, 0.01, 2.6, std(0x7a1820), -5.4, LANDING_Y + 0.025, -6.6); // runner rug
+// bedroom doorway (open door, light from the bedroom spills out)
+for (const z of [-7.97, -8.25]) {
+  box(0.1, 2.3, 0.06, trimMat, -6.25, LANDING_Y + 1.15, z);
+  box(0.1, 2.3, 0.06, trimMat, -4.95, LANDING_Y + 1.15, z);
+  box(1.4, 0.1, 0.06, trimMat, -5.6, LANDING_Y + 2.25, z);
+}
+box(1.2, 0.03, 0.3, lightWood, -5.6, LANDING_Y + 0.015, -8.1);
+const door = new THREE.Group(); door.position.set(-6.15, LANDING_Y, -8.3); door.rotation.y = 2.75; scene.add(door);
+addMesh(new THREE.BoxGeometry(1.15, 2.18, 0.05), std(0xe6dccb, { roughness: 0.6 }), 0.58, 1.09, 0, { parent: door });
+addMesh(new THREE.SphereGeometry(0.045, 10, 10), std(0xd4a640, { metalness: 0.8, roughness: 0.3 }), 1.02, 1.0, 0.05, { parent: door });
+addMesh(new THREE.BoxGeometry(0.3, 0.4, 0.01), std(0xf2c14e), 0.58, 1.6, 0.03, { parent: door }); // "Do not disturb (except Santa)" sign
+
+// railing helper: posts + rail between two points
+const railMat = std(0xefe7d6, { roughness: 0.5 });
+function railing(x1, y1, z1, x2, y2, z2, spacing, postBase = null) {
+  const a = new THREE.Vector3(x1, y1 + 0.95, z1), b = new THREE.Vector3(x2, y2 + 0.95, z2);
+  const len = a.distanceTo(b);
+  const rail = addMesh(new THREE.CylinderGeometry(0.045, 0.045, len, 8), darkWood, (a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2);
+  rail.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize());
+  const n = Math.max(1, Math.round(len / spacing));
+  for (let i = 0; i <= n; i++) {
+    const t = i / n, x = lerp(x1, x2, t), z = lerp(z1, z2, t);
+    const base = postBase ? postBase(x, z) : lerp(y1, y2, t);
+    const top = lerp(a.y, b.y, t);
+    addMesh(new THREE.CylinderGeometry(0.025, 0.025, top - base, 6), railMat, x, (top + base) / 2, z);
+  }
+}
+railing(-6, LANDING_Y, -5, -4, LANDING_Y, -5, 0.22);
+railing(-4, LANDING_Y, -8, -4, LANDING_Y, -5, 0.22);
+// garland on the landing railing
+for (let i = 0; i < 12; i++) addMesh(new THREE.SphereGeometry(0.08, 8, 8), std(0x1f5a2a), -4, LANDING_Y + 0.92 - Math.abs(Math.sin(i / 11 * Math.PI * 2)) * 0.12, -8 + i * 3 / 11);
+
+// --- Stairs ---
+const stairSide = std(0xe6dccb, { roughness: 0.7 });
+const treadMat = new THREE.MeshStandardMaterial({ map: stairTex, roughness: 0.6 });
+const creakMat = std(0x3a1f10, { roughness: 0.7 });
+for (let i = 0; i < STEP_COUNT - 1; i++) {
+  const h = LANDING_Y - (i + 1) * STEP_H;
+  const zc = -5 + i * STEP_D + STEP_D / 2;
+  box(2, h, STEP_D, stairSide, -7, h / 2, zc, W);
+  box(2.06, 0.05, STEP_D + 0.03, treadMat, -7, h, zc);
+  if (CREAKY.includes(i)) box(0.62, 0.056, STEP_D + 0.035, creakMat, -7, h, zc); // the suspicious board
+  else box(0.9, 0.06, STEP_D, std(0x7a1820), -7, h + 0.005, zc);               // carpet runner
+}
+const stepH = (z) => LANDING_Y - (Math.floor((z + 5) / STEP_D) + 1) * STEP_H;
+railing(-6, LANDING_Y - STEP_H, -5, -6, STEP_H * 2, 1.6, 0.34, (x, z) => Math.max(0, stepH(Math.min(z, 2.3))));
+box(0.16, 1.3, 0.16, darkWood, -6, 0.65, 2.6); // newel post
+addMesh(new THREE.SphereGeometry(0.11, 12, 12), darkWood, -6, 1.36, 2.6);
+const garlandBulbMats = [0xff4040, 0xffd24a, 0x5aa0ff].map((c) => new THREE.MeshBasicMaterial({ color: c }));
+for (let i = 0; i < 26; i++) {
+  const t = i / 25, z = lerp(-5, 1.6, t), y = lerp(LANDING_Y - STEP_H, STEP_H * 2, t) + 0.95 - Math.abs(Math.sin(t * Math.PI * 4)) * 0.18;
+  addMesh(new THREE.SphereGeometry(0.09, 8, 8), std(0x1f5a2a), -6, y, z);
+  if (i % 3 === 0) addMesh(new THREE.SphereGeometry(0.035, 8, 8), garlandBulbMats[(i / 3) % 3], -6.07, y - 0.05, z);
+}
+// family photos climbing the stairs
+[[-3.6, 0x6a8aa0], [-2.0, 0xa07a6a], [-0.4, 0x8aa06a], [1.2, 0x9a7ab0]].forEach(([z, c], i) => {
+  const y = Math.max(0, stepH(z)) + 1.6 + (i % 2) * 0.2;
+  box(0.04, 0.6, 0.48, std(0xb08a3a, { metalness: 0.4 }), -7.97, y, z);
+  box(0.045, 0.5, 0.38, std(c), -7.96, y, z);
+});
+
+// --- Archway to the kitchen ---
+box(0.5, 2.9, 0.15, trimMat, -8.12, 1.45, 3.93);
+box(0.5, 2.9, 0.15, trimMat, -8.12, 1.45, 7.57);
+box(0.5, 0.16, 3.8, trimMat, -8.12, 2.87, 5.75);
+for (let i = 0; i < 16; i++) {
+  const t = i / 15, z = lerp(4, 7.5, t), y = 2.95 - Math.sin(t * Math.PI) * 0.25;
+  addMesh(new THREE.SphereGeometry(0.09, 8, 8), std(0x1f5a2a), -7.82, y, z);
+  if (i % 3 === 1) addMesh(new THREE.SphereGeometry(0.035, 8, 8), garlandBulbMats[i % 3], -7.74, y - 0.06, z);
+}
+// mistletoe!
+addMesh(new THREE.CylinderGeometry(0.006, 0.006, 0.25), std(0xc41e24), -8.1, 2.66, 5.75);
+for (let i = 0; i < 7; i++) addMesh(new THREE.SphereGeometry(0.06, 8, 8), std(0x3d6b2a), -8.1 + rand(-0.06, 0.06), 2.5 + rand(-0.05, 0.03), 5.75 + rand(-0.07, 0.07));
+for (let i = 0; i < 5; i++) addMesh(new THREE.SphereGeometry(0.018, 6, 6), std(0xf4f1ea), -8.1 + rand(-0.06, 0.06), 2.46 + rand(-0.03, 0.03), 5.75 + rand(-0.06, 0.06));
+
+// --- Fireplace (right wall) ---
+const brickMat = new THREE.MeshStandardMaterial({ map: brickTex, roughness: 0.95 });
+box(1, 2.2, 0.7, brickMat, 7.5, 1.1, -1.45, W);
+box(1, 2.2, 0.7, brickMat, 7.5, 1.1, 1.45, W);
+box(1, 0.6, 2.2, brickMat, 7.5, 1.9, 0, W);
+box(0.2, 1.6, 2.2, std(0x120a08), 7.92, 0.8, 0);
+box(0.6, 0.02, 2.2, std(0x1a1210), 7.6, 0.02, 0);
+box(1.6, 0.12, 4.2, std(0x6b6460, { roughness: 0.9 }), 7.25, 0.06, 0);
+box(1.35, 0.15, 4.2, darkWood, 7.33, 2.28, 0);
+box(0.8, 3.65, 3, brickMat, 7.6, 4.18, 0, W);
+// fire screen, poker set
+for (let i = 0; i < 9; i++) addMesh(new THREE.CylinderGeometry(0.008, 0.008, 0.6), std(0x222222, { metalness: 0.7 }), 6.95, 0.42, -0.6 + i * 0.15);
+box(0.02, 0.03, 1.25, std(0x222222, { metalness: 0.7 }), 6.95, 0.72, 0);
+addMesh(new THREE.CylinderGeometry(0.015, 0.015, 0.9), std(0x222222, { metalness: 0.7 }), 6.85, 0.55, 1.95);
+addMesh(new THREE.CylinderGeometry(0.1, 0.12, 0.04), std(0x222222, { metalness: 0.7 }), 6.85, 0.14, 1.95);
+// logs + fire
+const logMat = std(0x3b2616);
+for (const [z, r] of [[-0.3, 0.3], [0.3, -0.3]]) { const l = addMesh(new THREE.CylinderGeometry(0.1, 0.1, 1.0, 10), logMat, 7.55, 0.14, z); l.rotation.x = Math.PI / 2; l.rotation.z = r; }
+const logPile = [[7.0, 0.1, 2.6], [7.0, 0.1, 2.85], [7.0, 0.28, 2.72]];
+for (const [x, y, z] of logPile) { const l = addMesh(new THREE.CylinderGeometry(0.09, 0.09, 0.7, 10), logMat, x - 0.3, y, z + 0.2); l.rotation.z = Math.PI / 2; }
+const flames = [];
+const flameMat = (c) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false });
+for (let i = 0; i < 9; i++) {
+  const f = addMesh(new THREE.ConeGeometry(rand(0.09, 0.16), rand(0.4, 0.7), 8), flameMat(i % 3 === 0 ? 0xffd060 : 0xff6a1a), 7.55 + rand(-0.12, 0.12), 0.45, rand(-0.45, 0.45));
+  f.userData.base = f.position.y; f.userData.seed = rand(0, 100); markDynamic(f);
+  flames.push(f);
+}
+const fireLight = new THREE.PointLight(0xff8a3a, 22, 0, 1.8);
+fireLight.position.set(7.0, 0.9, 0); scene.add(fireLight);
+// stockings
+const stockings = [];
+const stockingColors = [0xc41e24, 0x1f6a38, 0xc41e24];
+[-1.2, 0, 1.2].forEach((z, i) => {
+  const g = markDynamic(new THREE.Group()); g.position.set(6.62, 2.18, z); scene.add(g);
+  const m = std(stockingColors[i], { roughness: 1 });
+  addMesh(new THREE.BoxGeometry(0.08, 0.55, 0.26), m, 0, -0.35, 0, { parent: g });
+  addMesh(new THREE.BoxGeometry(0.08, 0.2, 0.42), m, 0, -0.62, 0.08, { parent: g });
+  addMesh(new THREE.BoxGeometry(0.1, 0.12, 0.3), std(0xf4f1ea, { roughness: 1 }), 0, -0.08, 0, { parent: g });
+  const stuff = new THREE.Group(); stuff.visible = false; g.add(stuff);
+  addMesh(new THREE.CylinderGeometry(0.025, 0.025, 0.35, 8), std(0xffffff, { emissive: 0x330000 }), 0, 0.05, -0.05, { parent: stuff });
+  addMesh(new THREE.TorusGeometry(0.06, 0.025, 8, 12, Math.PI), std(0xd42a2f), 0, 0.22, -0.11, { parent: stuff }).rotation.y = Math.PI / 2;
+  addMesh(new THREE.BoxGeometry(0.1, 0.12, 0.12), std(0x2a6ad4), 0, 0.0, 0.07, { parent: stuff });
+  stockings.push({ g, stuff, filled: false });
+});
+// mantel garland, candles, Christmas cards
+for (let i = 0; i < 18; i++) addMesh(new THREE.SphereGeometry(0.08, 8, 8), std(0x1f5a2a), 6.7, 2.36, -2 + i * 4 / 17);
+for (const z of [-1.7, 1.7]) {
+  addMesh(new THREE.CylinderGeometry(0.05, 0.05, 0.3, 10), std(0xf4ead4), 7.4, 2.5, z);
+  addMesh(new THREE.SphereGeometry(0.03, 8, 8), new THREE.MeshBasicMaterial({ color: 0xffc860 }), 7.4, 2.7, z);
+}
+[-0.9, -0.5, 0.4, 0.8].forEach((z, i) => { const c = box(0.02, 0.16, 0.12, std([0xf4f1ea, 0xc41e24, 0x1f6a38, 0xf2c14e][i]), 7.6, 2.44, z); c.rotation.y = rand(-0.4, 0.4); });
+// painting above the mantel
+const paintTex = canvasTex(256, 180, (g, w, h) => {
+  g.fillStyle = '#1b2a4a'; g.fillRect(0, 0, w, h);
+  g.fillStyle = '#e8eef8'; g.fillRect(0, h * 0.7, w, h);
+  for (let i = 0; i < 5; i++) { g.fillStyle = '#123'; g.beginPath(); const x = 30 + i * 50; g.moveTo(x, h * 0.72); g.lineTo(x + 18, h * 0.3 + rand(-10, 10)); g.lineTo(x + 36, h * 0.72); g.fill(); }
+  g.fillStyle = '#fff'; for (let i = 0; i < 60; i++) g.fillRect(rand(0, w), rand(0, h), 2, 2);
+});
+const painting = addMesh(new THREE.PlaneGeometry(1.6, 1.1), new THREE.MeshStandardMaterial({ map: paintTex }), 7.19, 3.7, 0);
+painting.rotation.y = -Math.PI / 2;
+box(0.05, 1.25, 1.75, std(0xb08a3a, { metalness: 0.5, roughness: 0.4 }), 7.21, 3.7, 0);
+// nutcrackers guarding the fireplace
+function nutcracker(x, z) {
+  const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = -Math.PI / 2; g.scale.setScalar(1.7); scene.add(g);
+  const P = (geo, col, px, py, pz, extra) => addMesh(geo, std(col, extra), px, py, pz, { parent: g });
+  P(new THREE.CylinderGeometry(0.16, 0.18, 0.06, 16), 0x2a1a10, 0, 0.03, 0);
+  for (const s of [-1, 1]) { P(new THREE.BoxGeometry(0.06, 0.08, 0.1), 0x111111, s * 0.045, 0.1, 0.01); P(new THREE.CylinderGeometry(0.03, 0.03, 0.2), 0xf4f1ea, s * 0.045, 0.24, 0); }
+  P(new THREE.CylinderGeometry(0.085, 0.095, 0.28, 14), 0xc41e24, 0, 0.47, 0);
+  P(new THREE.CylinderGeometry(0.097, 0.097, 0.03, 14), 0x111111, 0, 0.38, 0);
+  P(new THREE.BoxGeometry(0.03, 0.03, 0.01), 0xe8b830, 0, 0.38, 0.098, { metalness: 0.8 });
+  for (const s of [-1, 1]) P(new THREE.CylinderGeometry(0.025, 0.025, 0.22), 0xc41e24, s * 0.11, 0.48, 0);
+  P(new THREE.SphereGeometry(0.07, 14, 12), 0xf0c09c, 0, 0.68, 0);
+  P(new THREE.BoxGeometry(0.1, 0.06, 0.05), 0xf4f1ea, 0, 0.62, 0.05);
+  for (const s of [-1, 1]) P(new THREE.SphereGeometry(0.01, 6, 6), 0x111111, s * 0.025, 0.7, 0.065);
+  P(new THREE.CylinderGeometry(0.072, 0.075, 0.2, 14), 0x111111, 0, 0.82, 0);
+  P(new THREE.CylinderGeometry(0.076, 0.076, 0.025, 14), 0xe8b830, 0, 0.73, 0, { metalness: 0.8 });
+  P(new THREE.SphereGeometry(0.025, 8, 8), 0xe8b830, 0, 0.83, 0.07, { metalness: 0.8 });
+}
+nutcracker(7.45, 2.55); nutcracker(7.45, -2.55);
+
+// --- Christmas tree ---
+const TREE = new THREE.Vector3(5.4, 0, -5.4);
+addMesh(new THREE.CylinderGeometry(0.14, 0.18, 0.6, 10), std(0x4a2e18), TREE.x, 0.3, TREE.z);
+const skirt = addMesh(new THREE.CircleGeometry(1.7, 32), std(0x9b1b22, { roughness: 1 }), TREE.x, 0.015, TREE.z);
+skirt.rotation.x = -Math.PI / 2;
+const treeMat = std(0x1c5228, { roughness: 0.9 });
+const treeLayers = [[1.6, 1.6, 1.2], [1.3, 1.5, 2.1], [1.0, 1.3, 2.9], [0.65, 1.1, 3.6]];
+const bulbColors = [0xff3b3b, 0xffd24a, 0x4aa0ff, 0x5aff7a, 0xff7ae0];
+const bulbMats = bulbColors.map((c, i) => { const m = new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 2 }); m.userData.seed = i * 1.7; return m; });
+for (const [r, h, y] of treeLayers) {
+  addMesh(new THREE.ConeGeometry(r, h, 18), treeMat, TREE.x, y, TREE.z, { occ: true });
+  for (let i = 0; i < 16; i++) {
+    const a = rand(0, Math.PI * 2), t = rand(0.15, 0.95);
+    const rr = r * t + 0.03, yy = y + h / 2 - h * t;
+    addMesh(new THREE.SphereGeometry(0.05, 8, 8), bulbMats[(Math.random() * bulbMats.length) | 0], TREE.x + Math.cos(a) * rr, yy, TREE.z + Math.sin(a) * rr);
+  }
+  for (let i = 0; i < 6; i++) {
+    const a = rand(0, Math.PI * 2), t = rand(0.4, 0.95);
+    addMesh(new THREE.SphereGeometry(0.09, 12, 12), std([0xd4af37, 0xc0c0c8, 0xb01a20][i % 3], { metalness: 0.9, roughness: 0.25 }), TREE.x + Math.cos(a) * r * t, y + h / 2 - h * t, TREE.z + Math.sin(a) * r * t);
+  }
+  // candy canes hanging on the branches
+  for (let i = 0; i < 3; i++) {
+    const a = rand(0, Math.PI * 2), t = rand(0.5, 0.9);
+    addMesh(new THREE.CylinderGeometry(0.012, 0.012, 0.14), std(0xf4f1ea, { emissive: 0x220000 }), TREE.x + Math.cos(a) * r * t, y + h / 2 - h * t - 0.05, TREE.z + Math.sin(a) * r * t);
+  }
+}
+const starShape = new THREE.Shape();
+for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2 + Math.PI / 2, r = i % 2 ? 0.11 : 0.26; i ? starShape.lineTo(Math.cos(a) * r, Math.sin(a) * r) : starShape.moveTo(Math.cos(a) * r, Math.sin(a) * r); }
+const star = markDynamic(addMesh(new THREE.ExtrudeGeometry(starShape, { depth: 0.05, bevelEnabled: false }), new THREE.MeshStandardMaterial({ color: 0xffd860, emissive: 0xffc030, emissiveIntensity: 2.5 }), TREE.x, 4.3, TREE.z));
+star.rotation.y = Math.PI / 4;
+const treeLight = new THREE.PointLight(0xffb870, 9, 0, 1.8);
+treeLight.position.set(TREE.x - 0.8, 2.0, TREE.z + 0.8); scene.add(treeLight);
+// toy train circling the tree
+const TRACK_R = 1.8;
+for (const r of [TRACK_R - 0.06, TRACK_R + 0.06]) { const rail = addMesh(new THREE.TorusGeometry(r, 0.012, 6, 64), std(0x9a9aa0, { metalness: 0.8, roughness: 0.3 }), TREE.x, 0.03, TREE.z); rail.rotation.x = Math.PI / 2; }
+const ties = new THREE.InstancedMesh(new THREE.BoxGeometry(0.05, 0.015, 0.22), std(0x5a3a20), 56);
+{
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+  for (let i = 0; i < 56; i++) { const a = i / 56 * Math.PI * 2; q.setFromAxisAngle(up, -a); m.compose(new THREE.Vector3(TREE.x + Math.cos(a) * TRACK_R, 0.02, TREE.z + Math.sin(a) * TRACK_R), q, new THREE.Vector3(1, 1, 1)); ties.setMatrixAt(i, m); }
+  scene.add(ties);
+}
+const train = [];
+function trainCar(color, engine) {
+  const g = markDynamic(new THREE.Group()); scene.add(g);
+  const P = (geo, col, x, y, z, extra) => addMesh(geo, std(col, extra), x, y, z, { parent: g });
+  for (const sx of [-0.1, 0.1]) for (const sz of [-0.085, 0.085]) P(new THREE.CylinderGeometry(0.04, 0.04, 0.03, 12), 0x222222, sx, 0.05, sz).rotation.x = Math.PI / 2;
+  if (engine) {
+    P(new THREE.BoxGeometry(0.36, 0.05, 0.16), 0x222222, 0, 0.08, 0);
+    P(new THREE.CylinderGeometry(0.07, 0.07, 0.24, 14), color, 0.05, 0.17, 0).rotation.z = Math.PI / 2;
+    P(new THREE.CylinderGeometry(0.025, 0.035, 0.1, 10), 0x222222, 0.13, 0.27, 0);
+    P(new THREE.BoxGeometry(0.13, 0.17, 0.17), color, -0.11, 0.2, 0);
+    P(new THREE.BoxGeometry(0.16, 0.02, 0.19), 0x222222, -0.11, 0.29, 0);
+    P(new THREE.SphereGeometry(0.02, 8, 8), 0xffe9a0, 0.18, 0.17, 0, { emissive: 0xffd060, emissiveIntensity: 2 });
+  } else {
+    P(new THREE.BoxGeometry(0.32, 0.1, 0.16), color, 0, 0.11, 0);
+    P(new THREE.BoxGeometry(0.1, 0.08, 0.1), [0xf2c14e, 0x2a5ad4, 0xf4f1ea][train.length % 3], -0.05, 0.2, 0);
+    P(new THREE.BoxGeometry(0.07, 0.06, 0.07), 0xc41e24, 0.08, 0.19, 0.02);
+  }
+  train.push(g);
+}
+trainCar(0xc41e24, true); trainCar(0x1f6a38, false); trainCar(0x2a5ad4, false);
+
+// --- Living room furniture ---
+const sofaMat = std(0x6e2a24, { roughness: 1 });
+box(1.1, 0.45, 3.2, sofaMat, -0.45, 0.25, 0, W);
+box(0.9, 0.16, 1.5, std(0x7d332b, { roughness: 1 }), -0.35, 0.55, -0.77);
+box(0.9, 0.16, 1.5, std(0x7d332b, { roughness: 1 }), -0.35, 0.55, 0.77);
+box(0.3, 0.95, 3.2, sofaMat, -0.9, 0.85, 0, W);
+box(1.1, 0.7, 0.25, sofaMat, -0.45, 0.45, -1.62, W);
+box(1.1, 0.7, 0.25, sofaMat, -0.45, 0.45, 1.62, W);
+box(0.15, 0.45, 0.45, std(0x2a6a3a, { roughness: 1 }), -0.65, 0.85, 0.9).rotation.x = 0.3;
+box(0.15, 0.42, 0.42, std(0xe8d8b0, { roughness: 1 }), -0.65, 0.84, -0.95).rotation.x = -0.25;
+box(0.8, 0.04, 0.9, std(0x8a2a30, { roughness: 1 }), -0.75, 1.32, 0.2).rotation.z = 0.15; // knitted throw over the back
+const rug = addMesh(new THREE.CircleGeometry(2.6, 40), new THREE.MeshStandardMaterial({ map: rugTex, roughness: 1 }), 2.6, 0.012, 0);
+rug.rotation.x = -Math.PI / 2;
+// coffee table with cookies and milk
+box(1.0, 0.07, 1.6, darkWood, 2.3, 0.46, 0);
+for (const [dx, dz] of [[-0.42, -0.72], [0.42, -0.72], [-0.42, 0.72], [0.42, 0.72]]) box(0.07, 0.44, 0.07, darkWood, 2.3 + dx, 0.22, dz);
+box(0.9, 0.03, 1.5, darkWood, 2.3, 0.12, 0); // lower shelf
+box(0.35, 0.05, 0.25, std(0x2a5ad4), 2.2, 0.16, 0.4); box(0.3, 0.04, 0.22, std(0xc41e24), 2.25, 0.2, 0.42); // books on the shelf
+addMesh(new THREE.CylinderGeometry(0.2, 0.17, 0.02, 24), std(0xf6f2ea, { roughness: 0.3 }), 2.25, 0.505, -0.15);
+const cookies = [];
+for (let i = 0; i < 4; i++) {
+  const a = i / 4 * Math.PI * 2;
+  const c = markDynamic(addMesh(new THREE.CylinderGeometry(0.06, 0.06, 0.018, 14), std(0xb07a3a), 2.25 + Math.cos(a) * 0.09, 0.525 + i * 0.002, -0.15 + Math.sin(a) * 0.09));
+  for (let k = 0; k < 3; k++) addMesh(new THREE.SphereGeometry(0.01, 6, 6), std(0x2a1408), rand(-0.03, 0.03), 0.01, rand(-0.03, 0.03), { parent: c });
+  cookies.push(c);
+}
+addMesh(new THREE.CylinderGeometry(0.05, 0.045, 0.16, 16), new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.3, roughness: 0.1 }), 2.3, 0.58, 0.25);
+const milk = markDynamic(addMesh(new THREE.CylinderGeometry(0.043, 0.04, 0.13, 16), std(0xfafafa, { roughness: 0.4 }), 2.3, 0.565, 0.25));
+const noteTex = canvasTex(256, 160, (g) => { g.fillStyle = '#fff8e4'; g.fillRect(0, 0, 256, 160); g.fillStyle = '#b01a20'; g.font = 'italic 40px Georgia'; g.fillText('For Santa', 30, 70); g.font = '44px serif'; g.fillText('♥ ♥ ♥', 50, 130); });
+const note = addMesh(new THREE.PlaneGeometry(0.26, 0.16), new THREE.MeshStandardMaterial({ map: noteTex }), 2.45, 0.505, -0.45);
+note.rotation.x = -Math.PI / 2; note.rotation.z = 1.2;
+// poinsettia on the coffee table
+addMesh(new THREE.CylinderGeometry(0.07, 0.05, 0.1, 12), std(0xc8a040, { metalness: 0.5 }), 2.35, 0.55, 0.6);
+for (let i = 0; i < 7; i++) { const a = i / 7 * Math.PI * 2; const l = addMesh(new THREE.ConeGeometry(0.04, 0.14, 4), std(0xc41e24), 2.35 + Math.cos(a) * 0.06, 0.64, 0.6 + Math.sin(a) * 0.06); l.rotation.z = Math.cos(a) * 1.2; l.rotation.x = -Math.sin(a) * 1.2; }
+// armchair by the window, with a sleeping cat
+const chairMat = std(0x2c4a6a, { roughness: 1 });
+box(1.0, 0.5, 1.0, chairMat, 4.4, 0.25, 5.6, W);
+box(1.0, 1.0, 0.25, chairMat, 4.4, 0.75, 6.1, W);
+box(0.2, 0.7, 1.0, chairMat, 3.9, 0.45, 5.6); box(0.2, 0.7, 1.0, chairMat, 4.9, 0.45, 5.6);
+box(0.6, 0.3, 0.5, std(0x2c4a6a, { roughness: 1 }), 4.4, 0.15, 4.6); // footstool
+const cat = markDynamic(new THREE.Group()); cat.position.set(4.4, 0.52, 5.5); cat.rotation.y = 0.6; scene.add(cat);
+const catMat = std(0xd08a40, { roughness: 1 });
+const catBody = addMesh(new THREE.SphereGeometry(0.2, 14, 10), catMat, 0, 0.09, 0, { parent: cat }); catBody.scale.set(1.35, 0.6, 1);
+addMesh(new THREE.SphereGeometry(0.1, 12, 10), catMat, 0.22, 0.1, 0.08, { parent: cat });
+for (const s of [-1, 1]) addMesh(new THREE.ConeGeometry(0.035, 0.07, 4), catMat, 0.24 + s * 0.04, 0.2, 0.08 + s * 0.04, { parent: cat });
+const tail = addMesh(new THREE.TorusGeometry(0.2, 0.03, 6, 16, Math.PI * 1.1), catMat, 0, 0.04, 0, { parent: cat }); tail.rotation.x = Math.PI / 2;
+// grandfather clock on the front wall
+box(0.6, 2.4, 0.5, darkWood, -5.5, 1.2, 7.7, W);
+box(0.7, 0.15, 0.55, darkWood, -5.5, 2.45, 7.7);
+const clockFace = addMesh(new THREE.CircleGeometry(0.2, 24), std(0xf3ead2), -5.5, 1.95, 7.44);
+clockFace.rotation.y = Math.PI;
+const hand1 = box(0.015, 0.15, 0.01, std(0x111111), -5.5, 2.0, 7.43); hand1.rotation.z = 0.4;
+const hand2 = box(0.015, 0.11, 0.01, std(0x111111), -5.52, 1.92, 7.43); hand2.rotation.z = 1.2;
+const pendulum = markDynamic(new THREE.Group()); pendulum.position.set(-5.5, 1.6, 7.43); scene.add(pendulum);
+addMesh(new THREE.CylinderGeometry(0.01, 0.01, 0.6), std(0xc8a040, { metalness: 0.8 }), 0, -0.3, 0, { parent: pendulum });
+addMesh(new THREE.CylinderGeometry(0.08, 0.08, 0.02, 16), std(0xc8a040, { metalness: 0.8, roughness: 0.3 }), 0, -0.62, 0, { parent: pendulum }).rotation.x = Math.PI / 2;
+// side table with a lamp (off)
+box(0.6, 0.6, 0.6, darkWood, -0.5, 0.3, -2.6);
+addMesh(new THREE.CylinderGeometry(0.05, 0.08, 0.4, 10), std(0xc8a040, { metalness: 0.6 }), -0.5, 0.8, -2.6);
+addMesh(new THREE.CylinderGeometry(0.15, 0.25, 0.3, 16, 1, true), std(0xf0e4c8, { side: THREE.DoubleSide }), -0.5, 1.1, -2.6);
+addMesh(new THREE.SphereGeometry(0.08, 14, 12), new THREE.MeshStandardMaterial({ color: 0xddeeff, transparent: true, opacity: 0.5, roughness: 0.05 }), -0.35, 0.68, -2.45); // snow globe
+// bookshelf on the back wall
+box(2.4, 2.6, 0.04, darkWood, 0.5, 1.3, -7.97);
+for (const x of [-0.7, 1.7]) box(0.05, 2.6, 0.4, darkWood, x, 1.3, -7.8);
+for (let i = 0; i < 6; i++) box(2.4, 0.04, 0.4, darkWood, 0.5, 0.02 + i * 0.5, -7.8);
+for (let i = 0; i < 5; i++) shelfBooks(-0.65, 1.65, 0.04 + i * 0.5, -7.8, 0.32);
+addMesh(new THREE.SphereGeometry(0.1, 14, 12), std(0xc41e24, { metalness: 0.6, roughness: 0.3 }), 1.3, 2.62, -7.8);
+box(0.25, 0.3, 0.03, std(0xb08a3a, { metalness: 0.4 }), 0.0, 2.69, -7.75);
+// potted plants
+function plant(x, z) {
+  addMesh(new THREE.CylinderGeometry(0.25, 0.18, 0.4, 14), std(0xa0522d), x, 0.2, z);
+  for (let i = 0; i < 9; i++) addMesh(new THREE.SphereGeometry(rand(0.14, 0.22), 8, 8), std(0x2f6a2f), x + rand(-0.15, 0.15), rand(0.5, 1.1), z + rand(-0.15, 0.15));
+}
+plant(7.35, 7.35); plant(-3.5, -7.4);
+// chandelier (off)
+addMesh(new THREE.CylinderGeometry(0.015, 0.015, 0.9), std(0xc8a040, { metalness: 0.8 }), 2.3, 5.55, 0);
+const ring = addMesh(new THREE.TorusGeometry(0.45, 0.03, 8, 24), std(0xc8a040, { metalness: 0.8, roughness: 0.3 }), 2.3, 5.1, 0); ring.rotation.x = Math.PI / 2;
+for (let i = 0; i < 6; i++) {
+  const a = i / 6 * Math.PI * 2;
+  addMesh(new THREE.CylinderGeometry(0.03, 0.03, 0.14), std(0xf4ead4), 2.3 + Math.cos(a) * 0.45, 5.18, Math.sin(a) * 0.45);
+  addMesh(new THREE.SphereGeometry(0.035, 8, 8), std(0xffe0a0, { emissive: 0xffb050, emissiveIntensity: 0.4 }), 2.3 + Math.cos(a) * 0.45, 5.28, Math.sin(a) * 0.45);
+}
+
+// ===================== BEDROOM (upstairs, where you start) =====================
+floorPlane(-9, -3, -14, -8.2, LANDING_Y + 0.002, carpetTex, 2);
+ceilPlane(-9, -3, -14, -8.2, 6, 0xd8d4e8);
+wall('z', -8.23, -9, -3, LANDING_Y, 6, [{ a0: -6.2, a1: -5.0, y0: LANDING_Y, y1: 5.2 }], bedWallTex, { t: 0.02, tile: 1.5 });
+wall('z', -14.1, -9.2, -2.8, LANDING_Y, 6, [{ a0: -6.6, a1: -4.4, y0: 3.9, y1: 5.4 }], bedWallTex, { tile: 1.5 });
+wall('x', -9.1, -14.2, -8.2, LANDING_Y, 6, [], bedWallTex, { tile: 1.5 });
+wall('x', -2.9, -14.2, -8.2, LANDING_Y, 6, [], bedWallTex, { tile: 1.5 });
+box(6, 0.15, 0.04, trimMat, -6, LANDING_Y + 0.075, -13.98); box(0.04, 0.15, 5.8, trimMat, -8.98, LANDING_Y + 0.075, -11.1); box(0.04, 0.15, 5.8, trimMat, -3.02, LANDING_Y + 0.075, -11.1);
+addWindow('z', -14.1, -1, -6.6, -4.4, 3.9, 5.4, { curtains: 0x2a3a8a });
+const bedRug = addMesh(new THREE.CircleGeometry(1.2, 32), std(0xe8d8b0, { roughness: 1 }), -5.8, LANDING_Y + 0.006, -11);
+bedRug.rotation.x = -Math.PI / 2;
+// bed with the blankets thrown back
+const BY = LANDING_Y;
+box(1.4, 0.3, 2.3, lightWood, -8.25, BY + 0.25, -12.45);
+box(1.3, 0.22, 2.15, std(0xf4f1ea), -8.25, BY + 0.5, -12.45);
+box(1.4, 1.0, 0.08, lightWood, -8.25, BY + 0.75, -13.62);
+box(1.4, 0.55, 0.08, lightWood, -8.25, BY + 0.43, -11.28);
+box(1.36, 0.06, 1.1, std(0xb02a30, { roughness: 1 }), -8.25, BY + 0.64, -11.85);
+const flap = box(1.36, 0.08, 0.6, std(0xb02a30, { roughness: 1 }), -8.25, BY + 0.69, -12.55); flap.rotation.x = 0.12;
+box(1.36, 0.02, 0.06, std(0xf4f1ea, { roughness: 1 }), -8.25, BY + 0.72, -12.82);
+box(0.9, 0.14, 0.45, std(0xffffff, { roughness: 1 }), -8.25, BY + 0.68, -13.25);
+// teddy bear on the pillow
+{
+  const bear = std(0x8a5a30, { roughness: 1 }), tx = -8.6, ty = BY + 0.8, tz = -13.1;
+  addMesh(new THREE.SphereGeometry(0.12, 12, 10), bear, tx, ty, tz);
+  addMesh(new THREE.SphereGeometry(0.09, 12, 10), bear, tx, ty + 0.17, tz);
+  for (const s of [-1, 1]) { addMesh(new THREE.SphereGeometry(0.035, 8, 8), bear, tx + s * 0.07, ty + 0.25, tz); addMesh(new THREE.SphereGeometry(0.045, 8, 8), bear, tx + s * 0.1, ty - 0.08, tz + 0.06); }
+  addMesh(new THREE.SphereGeometry(0.035, 8, 8), std(0xd8b080), tx, ty + 0.15, tz + 0.08);
+  addMesh(new THREE.TorusGeometry(0.06, 0.015, 6, 12), std(0xc41e24), tx, ty + 0.09, tz).rotation.x = Math.PI / 2;
+}
+// nightstand, lamp (on) and alarm clock showing 3:07
+box(0.5, 0.55, 0.45, lightWood, -7.25, BY + 0.275, -13.5);
+addMesh(new THREE.CylinderGeometry(0.05, 0.08, 0.25, 10), std(0x2a5ad4), -7.3, BY + 0.68, -13.55);
+addMesh(new THREE.CylinderGeometry(0.1, 0.16, 0.2, 16, 1, true), std(0xffe2a8, { emissive: 0xffb860, emissiveIntensity: 1.2, side: THREE.DoubleSide }), -7.3, BY + 0.88, -13.55);
+const bedLamp = new THREE.PointLight(0xffc27a, 5, 10, 1.8);
+bedLamp.position.set(-7.3, BY + 1.0, -13.3); scene.add(bedLamp);
+const alarmTex = textTex(128, 64, (g) => { g.fillStyle = '#111'; g.fillRect(0, 0, 128, 64); g.fillStyle = '#ff3a2a'; g.font = 'bold 44px monospace'; g.fillText('3:07', 10, 48); });
+box(0.18, 0.1, 0.07, std(0x222222), -7.08, BY + 0.6, -13.42);
+addMesh(new THREE.PlaneGeometry(0.15, 0.075), new THREE.MeshBasicMaterial({ map: alarmTex }), -7.08, BY + 0.6, -13.384);
+// desk with a letter to Santa
+box(0.7, 0.05, 1.3, lightWood, -3.4, BY + 0.75, -12.2);
+for (const [dx, dz] of [[-0.3, -0.6], [0.3, -0.6], [-0.3, 0.6], [0.3, 0.6]]) box(0.05, 0.73, 0.05, lightWood, -3.4 + dx, BY + 0.37, -12.2 + dz);
+box(0.45, 0.05, 0.45, lightWood, -4.05, BY + 0.46, -12.2);
+for (const [dx, dz] of [[-0.18, -0.18], [0.18, -0.18], [-0.18, 0.18], [0.18, 0.18]]) box(0.04, 0.44, 0.04, lightWood, -4.05 + dx, BY + 0.22, -12.2 + dz);
+box(0.04, 0.5, 0.45, lightWood, -4.27, BY + 0.72, -12.2);
+const letterTex = textTex(256, 320, (g) => {
+  g.fillStyle = '#fffaf0'; g.fillRect(0, 0, 256, 320); g.strokeStyle = '#9ec0e8'; for (let y = 60; y < 320; y += 28) { g.beginPath(); g.moveTo(10, y); g.lineTo(246, y); g.stroke(); }
+  g.fillStyle = '#c41e24'; g.font = 'bold 30px "Comic Sans MS", cursive'; g.fillText('Dear Santa,', 16, 44);
+  g.fillStyle = '#2a3a8a'; g.font = '22px "Comic Sans MS", cursive';
+  ['I have been good', '(mostly).', 'Can I please have', 'a PUPPY and a', 'photo of YOU?', 'Love, me ♥'].forEach((l, i) => g.fillText(l, 16, 84 + i * 28));
+});
+const letter = addMesh(new THREE.PlaneGeometry(0.22, 0.28), new THREE.MeshStandardMaterial({ map: letterTex }), -3.45, BY + 0.78, -12.3);
+letter.rotation.x = -Math.PI / 2; letter.rotation.z = -1.4;
+for (let i = 0; i < 4; i++) { const cr = addMesh(new THREE.CylinderGeometry(0.008, 0.008, 0.1), std([0xc41e24, 0x2a5ad4, 0x1f6a38, 0xf2c14e][i]), -3.35, BY + 0.785, -11.85 + i * 0.03); cr.rotation.x = Math.PI / 2; }
+// posters
+const rocketTex = textTex(200, 280, (g) => {
+  g.fillStyle = '#0b1530'; g.fillRect(0, 0, 200, 280); g.fillStyle = '#fff'; for (let i = 0; i < 40; i++) g.fillRect(rand(0, 200), rand(0, 280), 2, 2);
+  g.fillStyle = '#e8e8f0'; g.beginPath(); g.moveTo(100, 40); g.quadraticCurveTo(140, 110, 125, 200); g.lineTo(75, 200); g.quadraticCurveTo(60, 110, 100, 40); g.fill();
+  g.fillStyle = '#c41e24'; g.beginPath(); g.moveTo(75, 170); g.lineTo(50, 220); g.lineTo(78, 205); g.fill(); g.beginPath(); g.moveTo(125, 170); g.lineTo(150, 220); g.lineTo(122, 205); g.fill();
+  g.fillStyle = '#4aa0ff'; g.beginPath(); g.arc(100, 110, 14, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#ffb030'; g.beginPath(); g.moveTo(80, 205); g.lineTo(100, 260); g.lineTo(120, 205); g.fill();
+});
+const poster1 = addMesh(new THREE.PlaneGeometry(0.7, 0.98), new THREE.MeshStandardMaterial({ map: rocketTex }), -3.01, BY + 1.8, -10.4);
+poster1.rotation.y = -Math.PI / 2;
+const deerTex = textTex(280, 200, (g) => {
+  g.fillStyle = '#1f6a38'; g.fillRect(0, 0, 280, 200); g.fillStyle = '#7a4a28';
+  g.beginPath(); g.ellipse(140, 120, 60, 32, 0, 0, Math.PI * 2); g.fill(); g.beginPath(); g.arc(205, 80, 22, 0, Math.PI * 2); g.fill();
+  g.fillRect(95, 140, 10, 45); g.fillRect(175, 140, 10, 45); g.strokeStyle = '#c8a070'; g.lineWidth = 5; g.beginPath(); g.moveTo(198, 60); g.lineTo(185, 25); g.lineTo(172, 35); g.moveTo(212, 60); g.lineTo(230, 25); g.lineTo(245, 32); g.stroke();
+  g.fillStyle = '#ff2020'; g.beginPath(); g.arc(226, 86, 8, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#f4f1ea'; g.font = 'bold 24px Georgia'; g.fillText('Rudolph', 20, 40);
+});
+const poster2 = addMesh(new THREE.PlaneGeometry(0.9, 0.64), new THREE.MeshStandardMaterial({ map: deerTex }), -8.99, BY + 1.7, -10.2);
+poster2.rotation.y = Math.PI / 2;
+// toy chest and scattered toys
+box(0.55, 0.5, 1.0, std(0xc41e24), -3.35, BY + 0.25, -9.6);
+box(0.57, 0.06, 1.02, std(0xf2c14e, { metalness: 0.3 }), -3.35, BY + 0.52, -9.6);
+[[-4.4, -10.2, 0xf2c14e], [-4.6, -10.0, 0x2a5ad4], [-4.5, -10.1, 0xc41e24], [-6.6, -9.6, 0x1f6a38]].forEach(([x, z, c], i) => { const b = box(0.12, 0.12, 0.12, std(c), x, BY + 0.06 + (i === 2 ? 0.12 : 0), z); b.rotation.y = rand(0, 1); });
+addMesh(new THREE.SphereGeometry(0.11, 14, 12), std(0x2a5ad4), -5.2, BY + 0.11, -12.9);
+// small bookshelf
+box(0.9, 1.3, 0.3, lightWood, -3.75, BY + 0.65, -13.82);
+for (let i = 0; i < 3; i++) shelfBooks(-4.15, -3.35, BY + 0.06 + i * 0.42, -13.8, 0.24);
+// fairy lights around the ceiling
+fairyLights(-8.9, -13.9, -3.1, -13.9, 5.85, 22); fairyLights(-3.1, -13.9, -3.1, -8.4, 5.85, 20);
+fairyLights(-3.1, -8.4, -8.9, -8.4, 5.85, 22); fairyLights(-8.9, -8.4, -8.9, -13.9, 5.85, 20);
+// a stocking on the bedpost, still empty
+box(0.06, 0.3, 0.14, std(0x1f6a38, { roughness: 1 }), -7.52, BY + 0.5, -11.25);
+
+// ===================== KITCHEN & DINING ROOM =====================
+const KX = -8.2;
+floorPlane(-17, KX, -1, 8, 0.001, kitFloorTex, 1.2);
+ceilPlane(-17, KX, -1, 8, 3.0, 0xe8e2d0);
+wall('x', -17.1, -1.2, 8.2, 0, 3.0, [{ a0: 1.2, a1: 2.8, y0: 1.45, y1: 2.5 }], kitWallTex);
+wall('z', -1.1, -17.2, KX, 0, 3.0, [], kitWallTex);
+wall('z', 8.1, -17.2, KX, 0, 3.0, [{ a0: -13, a1: -10.5, y0: 1.2, y1: 2.5 }], kitWallTex);
+wall('x', -8.23, -1, 8, 0, 3.0, [{ a0: 4, a1: 7.5, y0: 0, y1: 2.8 }], kitWallTex, { t: 0.02 });
+box(8.8, 0.15, 0.04, trimMat, -12.6, 0.075, -0.98); box(8.8, 0.15, 0.04, trimMat, -12.6, 0.075, 7.98);
+box(8.8, 0.12, 0.06, trimMat, -12.6, 2.94, -0.97); box(8.8, 0.12, 0.06, trimMat, -12.6, 2.94, 7.97);
+addWindow('x', -17.1, -1, 1.2, 2.8, 1.45, 2.5, { curtains: null });
+addWindow('z', 8.1, 1, -13, -10.5, 1.2, 2.5, { curtains: null });
+const cabMat = std(0xd9cfb8, { roughness: 0.6 }), counterMat = std(0x3a3a3e, { roughness: 0.35 }), knobMat = std(0xc8a040, { metalness: 0.8, roughness: 0.3 });
+// counters along the far wall and the back wall
+box(0.65, 0.88, 6.0, cabMat, -16.67, 0.44, 2.4);
+box(0.72, 0.05, 6.05, counterMat, -16.64, 0.905, 2.4);
+box(3.3, 0.88, 0.65, cabMat, -14.65, 0.44, -0.67);
+box(3.35, 0.05, 0.72, counterMat, -14.65, 0.905, -0.64);
+for (let z = -0.3; z < 5.3; z += 0.6) if (Math.abs(z - 4.2) > 0.4) { box(0.02, 0.7, 0.54, std(0xcdc2a8, { roughness: 0.6 }), -16.335, 0.45, z); box(0.03, 0.03, 0.12, knobMat, -16.32, 0.72, z + 0.18); }
+for (let x = -16; x < -13; x += 0.6) { box(0.54, 0.7, 0.02, std(0xcdc2a8, { roughness: 0.6 }), x, 0.45, -0.335); box(0.12, 0.03, 0.03, knobMat, x + 0.18, 0.72, -0.32); }
+box(0.02, 0.47, 6.0, tiled(tileTex, 6.0, 0.47, 0.6), -16.99, 1.165, 2.4);
+box(3.3, 0.47, 0.02, tiled(tileTex, 3.3, 0.47, 0.6), -14.65, 1.165, -0.99);
+// upper cabinets & range hood (with its little light left on)
+for (const [zc, len] of [[0.2, 1.6], [3.3, 0.6], [5.1, 0.6]]) { box(0.4, 0.8, len, cabMat, -16.8, 2.3, zc); box(0.02, 0.7, len - 0.08, std(0xcdc2a8, { roughness: 0.6 }), -16.59, 2.3, zc); }
+box(3.3, 0.8, 0.4, cabMat, -14.65, 2.3, -0.8);
+box(0.55, 0.25, 0.9, std(0xb8b8bc, { metalness: 0.6, roughness: 0.4 }), -16.72, 1.95, 4.2);
+box(0.3, 0.8, 0.4, std(0xb8b8bc, { metalness: 0.6, roughness: 0.4 }), -16.85, 2.5, 4.2);
+box(0.3, 0.01, 0.6, new THREE.MeshBasicMaterial({ color: 0xffe2a8 }), -16.7, 1.82, 4.2);
+const hoodLight = new THREE.PointLight(0xffd9a0, 2.6, 7, 1.8);
+hoodLight.position.set(-16.4, 1.7, 4.2); scene.add(hoodLight);
+// sink & faucet
+box(0.45, 0.04, 0.7, std(0x8a8a90, { metalness: 0.7, roughness: 0.3 }), -16.62, 0.92, 2.0);
+addMesh(new THREE.CylinderGeometry(0.02, 0.025, 0.3), std(0xb8b8bc, { metalness: 0.9, roughness: 0.2 }), -16.9, 1.07, 2.0);
+box(0.2, 0.025, 0.025, std(0xb8b8bc, { metalness: 0.9, roughness: 0.2 }), -16.82, 1.21, 2.0);
+// stove & oven
+box(0.62, 0.02, 0.75, std(0x111111, { roughness: 0.3 }), -16.64, 0.94, 4.2);
+for (const [dx, dz] of [[-0.14, -0.18], [0.14, -0.18], [-0.14, 0.18], [0.14, 0.18]]) { const b = addMesh(new THREE.TorusGeometry(0.07, 0.012, 6, 16), std(0x444444, { metalness: 0.6 }), -16.64 + dx, 0.955, 4.2 + dz); b.rotation.x = Math.PI / 2; }
+box(0.02, 0.6, 0.72, std(0x222222, { roughness: 0.4 }), -16.33, 0.45, 4.2);
+box(0.021, 0.25, 0.5, std(0x0a0a0a, { roughness: 0.1 }), -16.325, 0.43, 4.2);
+addMesh(new THREE.CylinderGeometry(0.015, 0.015, 0.55), std(0xb8b8bc, { metalness: 0.9 }), -16.29, 0.7, 4.2).rotation.x = Math.PI / 2;
+// fridge covered in drawings
+box(0.85, 2.0, 0.85, std(0xf2f2ee, { roughness: 0.35 }), -16.55, 1.0, 6.95);
+box(0.01, 0.01, 0.84, std(0x999999), -16.12, 1.35, 6.95);
+for (const y of [1.65, 0.9]) box(0.04, 0.35, 0.04, std(0xb8b8bc, { metalness: 0.8 }), -16.1, y, 6.6);
+const drawingTex = textTex(128, 160, (g) => {
+  g.fillStyle = '#fff'; g.fillRect(0, 0, 128, 160);
+  g.fillStyle = '#1f8a38'; g.beginPath(); g.moveTo(64, 20); g.lineTo(100, 120); g.lineTo(28, 120); g.fill();
+  g.fillStyle = '#f2c14e'; g.beginPath(); g.arc(64, 20, 9, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#c41e24'; g.fillRect(40, 125, 22, 18); g.fillStyle = '#2a5ad4'; g.fillRect(70, 128, 18, 15);
+});
+const familyTex = textTex(160, 128, (g) => {
+  g.fillStyle = '#fff'; g.fillRect(0, 0, 160, 128); g.strokeStyle = '#333'; g.lineWidth = 3;
+  [[30, 1], [70, 1.2], [110, 0.7]].forEach(([x, s]) => { g.beginPath(); g.arc(x, 45 - 10 * s, 10 * s, 0, Math.PI * 2); g.moveTo(x, 55 - 10 * s); g.lineTo(x, 95); g.moveTo(x - 15, 70); g.lineTo(x + 15, 70); g.moveTo(x, 95); g.lineTo(x - 10, 115); g.moveTo(x, 95); g.lineTo(x + 10, 115); g.stroke(); });
+  g.fillStyle = '#f2c14e'; g.beginPath(); g.arc(140, 18, 12, 0, Math.PI * 2); g.fill();
+});
+const d1 = addMesh(new THREE.PlaneGeometry(0.25, 0.32), new THREE.MeshStandardMaterial({ map: drawingTex }), -16.115, 1.6, 7.05); d1.rotation.y = Math.PI / 2; d1.rotation.x = 0.05;
+const d2 = addMesh(new THREE.PlaneGeometry(0.3, 0.24), new THREE.MeshStandardMaterial({ map: familyTex }), -16.115, 1.0, 7.1); d2.rotation.y = Math.PI / 2;
+// microwave with a glowing clock
+box(0.5, 0.3, 0.38, std(0x222222, { roughness: 0.4 }), -13.7, 1.08, -0.72);
+box(0.3, 0.2, 0.01, std(0x0a0a0a, { roughness: 0.1 }), -13.78, 1.08, -0.525);
+const mwTex = textTex(128, 64, (g) => { g.fillStyle = '#000'; g.fillRect(0, 0, 128, 64); g.fillStyle = '#3aff6a'; g.font = 'bold 40px monospace'; g.fillText('3:07', 14, 46); });
+addMesh(new THREE.PlaneGeometry(0.1, 0.05), new THREE.MeshBasicMaterial({ map: mwTex }), -13.52, 1.13, -0.524);
+// cookie jar, kettle, fruit bowl
+addMesh(new THREE.CylinderGeometry(0.11, 0.11, 0.22, 16), std(0xf4ead4, { roughness: 0.4 }), -15.3, 1.04, -0.7);
+addMesh(new THREE.SphereGeometry(0.06, 10, 8), std(0xc41e24), -15.3, 1.17, -0.7);
+addMesh(new THREE.SphereGeometry(0.12, 14, 10), std(0xc0c0c8, { metalness: 0.9, roughness: 0.2 }), -16.6, 1.04, 5.0);
+addMesh(new THREE.CylinderGeometry(0.16, 0.1, 0.08, 16), std(0x7a5230), -14.6, 0.97, -0.68);
+for (let i = 0; i < 5; i++) addMesh(new THREE.SphereGeometry(0.045, 10, 8), std([0xff8a1a, 0xc41e24, 0xffd24a][i % 3]), -14.6 + rand(-0.07, 0.07), 1.02 + (i > 3 ? 0.05 : 0), -0.68 + rand(-0.07, 0.07));
+// carrots for the reindeer (Santa takes these!)
+addMesh(new THREE.CylinderGeometry(0.16, 0.13, 0.02, 20), std(0xf6f2ea, { roughness: 0.3 }), -16.6, 0.94, 3.25);
+const carrots = [];
+for (let i = 0; i < 3; i++) {
+  const g = markDynamic(new THREE.Group()); g.position.set(-16.6, 0.97, 3.18 + i * 0.07); g.rotation.y = rand(-0.3, 0.3); scene.add(g);
+  addMesh(new THREE.ConeGeometry(0.022, 0.2, 8), std(0xff7a1a), 0, 0, 0, { parent: g }).rotation.z = Math.PI / 2;
+  addMesh(new THREE.ConeGeometry(0.02, 0.06, 5), std(0x2f8a2f), 0.12, 0, 0, { parent: g }).rotation.z = -Math.PI / 2;
+  carrots.push(g);
+}
+const deerNoteTex = textTex(200, 100, (g) => { g.fillStyle = '#fff8e4'; g.fillRect(0, 0, 200, 100); g.fillStyle = '#1f6a38'; g.font = 'italic 26px Georgia'; g.fillText('For the', 20, 40); g.fillText('reindeer!', 20, 78); });
+const deerNote = addMesh(new THREE.PlaneGeometry(0.16, 0.08), new THREE.MeshStandardMaterial({ map: deerNoteTex }), -16.45, 0.935, 2.9); deerNote.rotation.x = -Math.PI / 2; deerNote.rotation.z = -Math.PI / 2;
+// kitchen runner rug
+box(0.8, 0.01, 4.0, std(0x8a2a30, { roughness: 1 }), -15.7, 0.006, 2.4);
+// dining table set for Christmas dinner
+const TX = -11.5, TZ = 3.8;
+box(1.3, 0.06, 2.5, darkWood, TX, 0.76, TZ);
+for (const [dx, dz] of [[-0.55, -1.1], [0.55, -1.1], [-0.55, 1.1], [0.55, 1.1]]) box(0.07, 0.73, 0.07, darkWood, TX + dx, 0.37, TZ + dz);
+box(1.36, 0.01, 2.56, std(0xb01a20, { roughness: 1 }), TX, 0.795, TZ);
+box(0.4, 0.012, 2.6, std(0xf2c14e, { roughness: 0.8 }), TX, 0.802, TZ);
+function chair(x, z, rot, y = 0) {
+  const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = rot; scene.add(g);
+  addMesh(new THREE.BoxGeometry(0.45, 0.05, 0.45), darkWood, 0, 0.46, 0, { parent: g });
+  for (const [dx, dz] of [[-0.19, -0.19], [0.19, -0.19], [-0.19, 0.19], [0.19, 0.19]]) addMesh(new THREE.BoxGeometry(0.04, 0.45, 0.04), darkWood, dx, 0.22, dz, { parent: g });
+  addMesh(new THREE.BoxGeometry(0.45, 0.55, 0.04), darkWood, 0, 0.75, -0.21, { parent: g });
+  addMesh(new THREE.BoxGeometry(0.4, 0.04, 0.4), std(0xb01a20, { roughness: 1 }), 0, 0.5, 0, { parent: g });
+}
+for (const dz of [-0.7, 0, 0.7]) { chair(TX - 0.95, TZ + dz, Math.PI / 2); chair(TX + 0.95, TZ + dz, -Math.PI / 2); }
+chair(TX, TZ - 1.55, 0); chair(TX, TZ + 1.55, Math.PI);
+for (const dz of [-0.7, 0, 0.7]) for (const s of [-1, 1]) {
+  addMesh(new THREE.CylinderGeometry(0.13, 0.11, 0.015, 20), std(0xf6f2ea, { roughness: 0.3 }), TX + s * 0.45, 0.81, TZ + dz);
+  box(0.03, 0.005, 0.18, std(0xc8c8cc, { metalness: 0.9, roughness: 0.2 }), TX + s * 0.45, 0.805, TZ + dz + 0.17);
+  addMesh(new THREE.CylinderGeometry(0.03, 0.025, 0.12, 12), new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.35, roughness: 0.1 }), TX + s * 0.35, 0.86, TZ + dz - 0.18);
+}
+// gingerbread house centrepiece and candles
+{
+  const gb = std(0xa0622d, { roughness: 0.9 }), icing = std(0xffffff, { roughness: 0.6 });
+  box(0.3, 0.2, 0.36, gb, TX, 0.91, TZ);
+  for (const s of [-1, 1]) { const r = box(0.22, 0.02, 0.4, icing, TX + s * 0.08, 1.06, TZ); r.rotation.z = -s * 0.75; }
+  box(0.08, 0.12, 0.005, std(0x5a3010), TX, 0.87, TZ + 0.181);
+  for (let i = 0; i < 6; i++) addMesh(new THREE.SphereGeometry(0.018, 8, 6), std([0xc41e24, 0x1f8a38, 0xf2c14e][i % 3]), TX + rand(-0.13, 0.13), 0.92 + rand(-0.06, 0.06), TZ + 0.182);
+  for (const dz of [-0.7, 0.7]) {
+    addMesh(new THREE.CylinderGeometry(0.05, 0.06, 0.04, 12), std(0xc8a040, { metalness: 0.8 }), TX, 0.82, TZ + dz);
+    addMesh(new THREE.CylinderGeometry(0.02, 0.02, 0.3, 10), std(0xc41e24), TX, 0.99, TZ + dz);
+  }
+}
+// pendant lamp over the table (off)
+addMesh(new THREE.CylinderGeometry(0.01, 0.01, 0.7), std(0x222222), TX, 2.65, TZ);
+addMesh(new THREE.ConeGeometry(0.3, 0.25, 20, 1, true), std(0x1f4a33, { side: THREE.DoubleSide }), TX, 2.2, TZ);
+// calendar on the wall
+const calTex = textTex(200, 260, (g) => {
+  g.fillStyle = '#fff'; g.fillRect(0, 0, 200, 260); g.fillStyle = '#c41e24'; g.fillRect(0, 0, 200, 60);
+  g.fillStyle = '#fff'; g.font = 'bold 26px Georgia'; g.fillText('DECEMBER', 28, 40);
+  g.fillStyle = '#333'; g.font = '14px sans-serif';
+  for (let d = 1; d <= 31; d++) { const c = (d + 1) % 7, r = Math.floor((d + 1) / 7); g.fillText(String(d), 12 + c * 27, 90 + r * 32); }
+  g.strokeStyle = '#c41e24'; g.lineWidth = 3; g.beginPath(); g.arc(12 + 5 * 27 + 7, 90 + 3 * 32 - 5, 14, 0, Math.PI * 2); g.stroke();
+});
+const cal = addMesh(new THREE.PlaneGeometry(0.4, 0.52), new THREE.MeshStandardMaterial({ map: calTex }), -8.26, 1.7, 1.5); cal.rotation.y = -Math.PI / 2;
+// wall clock above the archway
+const kclock = addMesh(new THREE.CylinderGeometry(0.2, 0.2, 0.04, 24), std(0xf3ead2), -8.27, 2.6, 1.5); kclock.rotation.z = Math.PI / 2;
+
+// ===================== MORE ROOMS =====================
+const UY = LANDING_Y;
+const hallTex = canvasTex(256, 256, (g, w, h) => {
+  g.fillStyle = '#2f4a3c'; g.fillRect(0, 0, w, h);
+  g.fillStyle = 'rgba(230,210,150,0.18)';
+  for (let y = 0; y < h; y += 64) for (let x = 0; x < w; x += 64) { const ox = (y / 64) % 2 ? 32 : 0; g.beginPath(); g.ellipse(x + ox + 16, y + 32, 8, 14, 0, 0, Math.PI * 2); g.fill(); }
+});
+const studyTex = canvasTex(256, 256, (g, w, h) => {
+  g.fillStyle = '#3a2a1c'; g.fillRect(0, 0, w, h);
+  for (let x = 0; x < w; x += 64) { g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillRect(x, 0, 3, h); g.fillStyle = 'rgba(255,220,160,0.06)'; g.fillRect(x + 8, 8, 48, h - 16); }
+});
+const parentsTex = canvasTex(256, 256, (g, w, h) => {
+  g.fillStyle = '#cdb9a0'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 18; i++) {
+    const x = rand(0, w), y = rand(0, h);
+    g.fillStyle = 'rgba(150,60,70,0.35)';
+    for (let k = 0; k < 5; k++) { const a = k / 5 * Math.PI * 2; g.beginPath(); g.arc(x + Math.cos(a) * 5, y + Math.sin(a) * 5, 4, 0, Math.PI * 2); g.fill(); }
+    g.fillStyle = 'rgba(240,200,90,0.6)'; g.beginPath(); g.arc(x, y, 3, 0, Math.PI * 2); g.fill();
+  }
+});
+const beigeCarpetTex = canvasTex(256, 256, (g, w, h) => {
+  g.fillStyle = '#a89478'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 4000; i++) { g.fillStyle = `rgba(${Math.random() < 0.5 ? '255,255,255' : '0,0,0'},0.05)`; g.fillRect(rand(0, w), rand(0, h), 2, 2); }
+});
+// trim around a wall opening (both faces) plus a threshold
+function doorTrim(axis, c, a0, a1, y0, h) {
+  for (const n of [-0.13, 0.13]) {
+    wbox(axis, c, 1, 0.1, h + 0.1, 0.06, a0 - 0.05, y0 + h / 2, n, trimMat);
+    wbox(axis, c, 1, 0.1, h + 0.1, 0.06, a1 + 0.05, y0 + h / 2, n, trimMat);
+    wbox(axis, c, 1, a1 - a0 + 0.3, 0.1, 0.06, (a0 + a1) / 2, y0 + h + 0.05, n, trimMat);
+  }
+  wbox(axis, c, 1, a1 - a0, 0.03, 0.3, (a0 + a1) / 2, y0 + 0.015, 0, lightWood);
+}
+function doorSlab(x, y, z, rot) {
+  const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = rot; scene.add(g);
+  addMesh(new THREE.BoxGeometry(1.15, 2.18, 0.05), std(0xe6dccb, { roughness: 0.6 }), 0.58, 1.09, 0, { parent: g });
+  addMesh(new THREE.SphereGeometry(0.045, 10, 10), std(0xd4a640, { metalness: 0.8, roughness: 0.3 }), 1.02, 1.0, 0.05, { parent: g });
+}
+
+// --- Upstairs hallway (off the landing) ---
+doorTrim('x', -8.1, -7.2, -5.9, UY, 2.2);
+floorPlane(-14, -8.2, -8, -5, UY + 0.002, floorTex, 4);
+ceilPlane(-14, -8.2, -8, -5, 6, 0xcfc6b8);
+wall('z', -8.1, -14.2, -8.2, UY, 6, [{ a0: -12.2, a1: -11.0, y0: UY, y1: UY + 2.2 }], hallTex);
+wall('z', -4.9, -17.2, -8.2, UY, 6, [{ a0: -11.6, a1: -10.4, y0: UY, y1: UY + 2.2 }], hallTex);
+wall('x', -14.1, -8.2, -4.8, UY, 6, [], hallTex);
+wall('x', -8.23, -8, -5, UY, 6, [{ a0: -7.2, a1: -5.9, y0: UY, y1: UY + 2.2 }], hallTex, { t: 0.02 });
+box(5.2, 0.01, 0.9, std(0x7a1820), -11.1, UY + 0.006, -6.5);
+box(0.4, 0.8, 1.2, darkWood, -13.75, UY + 0.4, -6.5);
+addMesh(new THREE.CylinderGeometry(0.08, 0.06, 0.25, 12), std(0x2a5ad4, { roughness: 0.3 }), -13.75, UY + 0.93, -6.3);
+for (let i = 0; i < 5; i++) addMesh(new THREE.SphereGeometry(0.05, 8, 8), std(0xc41e24), -13.75 + rand(-0.06, 0.06), UY + 1.12 + rand(0, 0.1), -6.3 + rand(-0.06, 0.06));
+box(0.3, 0.22, 0.03, std(0xb08a3a, { metalness: 0.4 }), -13.75, UY + 0.92, -6.75);
+[-12.8, -9.6].forEach((x, i) => { box(0.7, 0.55, 0.04, std(0xb08a3a, { metalness: 0.4 }), x, UY + 1.6, -5.02); box(0.6, 0.45, 0.045, std([0x8a6a9a, 0x6a9a8a][i]), x, UY + 1.6, -5.03); });
+addMesh(new THREE.CylinderGeometry(0.3, 0.25, 0.5, 14, 1, true), std(0xc8a070, { side: THREE.DoubleSide }), -9.0, UY + 0.25, -7.6);
+box(0.4, 0.15, 0.35, std(0x6a8ac0, { roughness: 1 }), -9.0, UY + 0.45, -7.6);
+addMesh(new THREE.CylinderGeometry(0.25, 0.25, 0.06, 20), std(0xf0ead8), -11, 5.97, -6.5);
+box(0.08, 0.1, 0.02, new THREE.MeshBasicMaterial({ color: 0xffe9b0 }), -13.2, UY + 0.3, -7.99); // plug-in night light
+fairyLights(-14, -5.1, -8.3, -5.1, 5.85, 24, 0.12);
+
+// --- Bathroom ---
+doorTrim('z', -8.1, -12.2, -11.0, UY, 2.2);
+doorSlab(-12.15, UY, -8.3, 2.75);
+floorPlane(-14, -9.2, -11, -8.2, UY + 0.002, tileTex, 0.5);
+ceilPlane(-14, -9.2, -11, -8.2, 6, 0xeef0f0);
+wall('x', -14.1, -11.2, -8.2, UY, 6, [{ a0: -10.2, a1: -9.0, y0: UY + 1.3, y1: UY + 2.2 }], tileTex, { tile: 0.6 });
+wall('z', -11.1, -14.2, -9.2, UY, 6, [], tileTex, { tile: 0.6 });
+wall('x', -9.23, -11, -8.2, UY, 6, [], tileTex, { t: 0.02, tile: 0.6 });
+wall('z', -8.23, -14, -9.2, UY, 6, [{ a0: -12.2, a1: -11.0, y0: UY, y1: UY + 2.2 }], tileTex, { t: 0.02, tile: 0.6 });
+addWindow('x', -14.1, -1, -10.2, -9.0, UY + 1.3, UY + 2.2, { curtains: null, minY: UY });
+const porcelain = std(0xf6f6f2, { roughness: 0.25 }), chrome = std(0xc0c0c8, { metalness: 0.9, roughness: 0.2 });
+box(1.7, 0.55, 0.75, porcelain, -12.9, UY + 0.275, -10.6);
+box(1.5, 0.02, 0.58, std(0x8ab8d8, { roughness: 0.1 }), -12.9, UY + 0.45, -10.6);
+box(0.06, 0.25, 0.06, chrome, -13.68, UY + 0.65, -10.6);
+addMesh(new THREE.SphereGeometry(0.06, 10, 8), std(0xffd020), -12.4, UY + 0.5, -10.55);
+addMesh(new THREE.SphereGeometry(0.04, 10, 8), std(0xffd020), -12.36, UY + 0.57, -10.55);
+box(0.03, 0.015, 0.03, std(0xff7a1a), -12.32, UY + 0.565, -10.55);
+box(0.4, 0.4, 0.5, porcelain, -9.6, UY + 0.2, -10.65); box(0.42, 0.04, 0.48, porcelain, -9.6, UY + 0.42, -10.6); box(0.45, 0.4, 0.18, porcelain, -9.6, UY + 0.65, -10.9);
+addMesh(new THREE.CylinderGeometry(0.08, 0.1, 0.75, 12), porcelain, -11.2, UY + 0.375, -10.75);
+box(0.55, 0.12, 0.4, porcelain, -11.2, UY + 0.8, -10.78);
+addMesh(new THREE.CylinderGeometry(0.015, 0.015, 0.15), chrome, -11.2, UY + 0.93, -10.93);
+box(0.6, 0.8, 0.02, std(0xd8e4ee, { metalness: 0.9, roughness: 0.05 }), -11.2, UY + 1.6, -10.98);
+box(0.68, 0.88, 0.015, std(0xb08a3a, { metalness: 0.4 }), -11.2, UY + 1.6, -10.99);
+box(0.03, 0.03, 0.8, chrome, -9.27, UY + 1.3, -9.4);
+box(0.05, 0.6, 0.35, std(0xc41e24, { roughness: 1 }), -9.28, UY + 1.05, -9.6); box(0.05, 0.5, 0.35, std(0x2a6a3a, { roughness: 1 }), -9.28, UY + 1.1, -9.2);
+box(0.8, 0.01, 0.5, std(0x6a8ac0, { roughness: 1 }), -12.5, UY + 0.006, -9.9);
+box(0.1, 0.1, 0.02, new THREE.MeshBasicMaterial({ color: 0xbfe0ff }), -9.6, UY + 0.35, -8.25);
+const bathLight = new THREE.PointLight(0x9fc4ff, 1.6, 5, 2);
+bathLight.position.set(-9.8, UY + 0.5, -8.6); scene.add(bathLight);
+
+// --- Parents' bedroom (they're asleep... don't wake them!) ---
+doorTrim('z', -4.9, -11.6, -10.4, UY, 2.2);
+doorSlab(-11.55, UY, -4.7, -2.75);
+floorPlane(-17, -8.2, -4.8, 2, UY + 0.002, beigeCarpetTex, 2);
+ceilPlane(-17, -8.2, -4.8, 2, 6, 0xe8e0d4);
+wall('x', -17.1, -5, 2.2, UY, 6, [{ a0: -3.6, a1: -2.0, y0: UY + 1.0, y1: UY + 2.3 }], parentsTex);
+wall('z', 2.1, -17.2, -8.2, UY, 6, [], parentsTex);
+wall('z', -4.77, -17, -8.2, UY, 6, [{ a0: -11.6, a1: -10.4, y0: UY, y1: UY + 2.2 }], parentsTex, { t: 0.02 });
+wall('x', -8.23, -4.8, 2, UY, 6, [], parentsTex, { t: 0.02 });
+addWindow('x', -17.1, -1, -3.6, -2.0, UY + 1.0, UY + 2.3, { curtains: 0x7a2a3a, minY: UY });
+const PB = -12.5; // bed centre
+box(2.8, 0.01, 3.0, std(0x7a2a3a, { roughness: 1 }), PB, UY + 0.006, 0.4);
+box(2.1, 0.3, 2.3, darkWood, PB, UY + 0.25, 0.8);
+box(2.0, 0.24, 2.2, std(0xf4f1ea), PB, UY + 0.52, 0.8);
+box(2.2, 1.3, 0.1, darkWood, PB, UY + 0.95, 1.97);
+box(2.04, 0.08, 1.6, std(0x3a5a8a, { roughness: 1 }), PB, UY + 0.68, 0.45);
+for (const dx of [-0.5, 0.5]) box(0.7, 0.14, 0.4, std(0xffffff, { roughness: 1 }), PB + dx, UY + 0.72, 1.6);
+const sleepers = [];
+[[-0.5, 0x5a3a20], [0.5, 0x2a2a2a]].forEach(([dx, hair]) => {
+  const g = markDynamic(new THREE.Group()); g.position.set(PB + dx, UY + 0.7, 0.5); scene.add(g);
+  const lump = addMesh(new THREE.SphereGeometry(0.35, 14, 10), std(0x3a5a8a, { roughness: 1 }), 0, 0.02, 0, { parent: g }); lump.scale.set(0.9, 0.35, 1.9);
+  addMesh(new THREE.SphereGeometry(0.13, 14, 12), std(0xf0c09c), 0, 0.12, 1.02, { parent: g });
+  addMesh(new THREE.SphereGeometry(0.135, 14, 12, 0, Math.PI * 2, 0, Math.PI / 2), std(hair, { roughness: 1 }), 0, 0.15, 1.05, { parent: g }).rotation.x = -0.6;
+  sleepers.push(lump);
+});
+for (const x of [PB - 1.4, PB + 1.4]) {
+  box(0.55, 0.55, 0.45, darkWood, x, UY + 0.275, 1.7);
+  addMesh(new THREE.CylinderGeometry(0.05, 0.08, 0.25, 10), std(0xc8a040, { metalness: 0.6 }), x, UY + 0.68, 1.75);
+  addMesh(new THREE.CylinderGeometry(0.1, 0.16, 0.2, 16, 1, true), std(0xf0e4c8, { side: THREE.DoubleSide }), x, UY + 0.88, 1.75);
+}
+box(0.18, 0.1, 0.07, std(0x222222), PB + 1.3, UY + 0.6, 1.6);
+const pClock = addMesh(new THREE.PlaneGeometry(0.15, 0.075), new THREE.MeshBasicMaterial({ map: alarmTex }), PB + 1.3, UY + 0.6, 1.564); pClock.rotation.y = Math.PI;
+box(0.7, 2.2, 1.4, darkWood, -16.6, UY + 1.1, 0.8);
+box(0.01, 2.0, 0.01, std(0x111111), -16.24, UY + 1.1, 0.8);
+for (const z of [0.7, 0.9]) box(0.03, 0.2, 0.03, knobMat, -16.23, UY + 1.15, z);
+box(0.5, 1.0, 1.6, darkWood, -8.55, UY + 0.5, -2.5);                       // dresser
+for (const y of [0.25, 0.55, 0.85]) box(0.02, 0.22, 1.5, std(0x5a3a22), -8.8, UY + y, -2.5);
+box(0.03, 0.9, 1.1, std(0xd8e4ee, { metalness: 0.9, roughness: 0.05 }), -8.24, UY + 1.6, -2.5); // mirror
+box(0.3, 0.2, 0.22, std(0x222222, { roughness: 0.8 }), -8.6, UY + 1.1, -2.1);  // Dad's camera bag
+const filmMat = new THREE.MeshStandardMaterial({ color: 0xffd040, emissive: 0xffb000, emissiveIntensity: 0.8, roughness: 0.4 });
+const filmPickup = markDynamic(addMesh(new THREE.CylinderGeometry(0.04, 0.04, 0.07, 14), filmMat, -8.6, UY + 1.04, -2.75));
+box(0.08, 0.05, 0.15, std(0x6a3a20), -12.0, UY + 0.03, -0.55); box(0.08, 0.05, 0.15, std(0x6a3a20), -11.85, UY + 0.03, -0.5); // slippers
+chair(-16.2, -1.0, Math.PI / 2, UY);
+box(0.4, 0.06, 0.4, std(0x6a8ac0, { roughness: 1 }), -16.2, UY + 0.53, -1.0); // folded clothes
+
+// --- Study (downstairs, behind the living room) ---
+doorTrim('z', -8.1, 2.1, 3.3, 0, 2.3);
+doorSlab(2.15, 0, -8.3, 2.75);
+floorPlane(-1, 6, -13, -8.2, 0.001, floorTex, 4);
+ceilPlane(-1, 6, -13, -8.2, 3.0, 0xd8cfc0);
+wall('z', -13.1, -1.2, 6.2, 0, 3, [{ a0: 1.2, a1: 3.4, y0: 1.0, y1: 2.3 }], studyTex);
+wall('x', -1.1, -13.2, -8.2, 0, 3, [], studyTex);
+wall('x', 6.1, -13.2, -8.2, 0, 3, [], studyTex);
+wall('z', -8.23, -1, 6, 0, 3, [{ a0: 2.1, a1: 3.3, y0: 0, y1: 2.3 }], studyTex, { t: 0.02 });
+addWindow('z', -13.1, -1, 1.2, 3.4, 1.0, 2.3, { curtains: 0x5a2a1a });
+box(3.0, 0.01, 2.2, std(0x5a1a20, { roughness: 1 }), 2.5, 0.006, -10.5);
+// desk, banker's lamp (on), computer
+box(1.6, 0.05, 0.8, darkWood, 2.3, 0.75, -12.4);
+for (const x of [1.7, 2.9]) box(0.4, 0.73, 0.75, darkWood, x, 0.365, -12.4);
+addMesh(new THREE.CylinderGeometry(0.07, 0.08, 0.03, 14), std(0xc8a040, { metalness: 0.8 }), 2.85, 0.79, -12.3);
+addMesh(new THREE.CylinderGeometry(0.01, 0.01, 0.3), std(0xc8a040, { metalness: 0.8 }), 2.85, 0.94, -12.3);
+const shade = addMesh(new THREE.CylinderGeometry(0.1, 0.1, 0.3, 16, 1, false, 0, Math.PI), std(0x1f7a3a, { emissive: 0x0a3a1a, roughness: 0.3, side: THREE.DoubleSide }), 2.85, 1.1, -12.3);
+shade.rotation.z = Math.PI / 2;
+const studyLamp = new THREE.PointLight(0xffd9a0, 2.6, 7, 1.8);
+studyLamp.position.set(2.85, 1.0, -12.2); scene.add(studyLamp);
+box(0.6, 0.38, 0.04, std(0x111111), 2.1, 1.07, -12.65);
+box(0.06, 0.2, 0.06, std(0x111111), 2.1, 0.87, -12.65);
+const screenTex = textTex(256, 160, (g) => {
+  g.fillStyle = '#04102a'; g.fillRect(0, 0, 256, 160); g.fillStyle = '#fff'; for (let i = 0; i < 50; i++) g.fillRect(rand(0, 256), rand(0, 160), 2, 2);
+  g.fillStyle = '#f2c14e'; g.font = 'bold 26px Georgia'; g.fillText('Merry Christmas!', 22, 90);
+});
+addMesh(new THREE.PlaneGeometry(0.56, 0.34), new THREE.MeshBasicMaterial({ map: screenTex }), 2.1, 1.07, -12.628);
+box(0.45, 0.02, 0.15, std(0x222222), 2.1, 0.785, -12.2);
+addMesh(new THREE.CylinderGeometry(0.04, 0.035, 0.1, 12), std(0xc41e24), 1.65, 0.82, -12.2);
+// office chair
+addMesh(new THREE.CylinderGeometry(0.25, 0.25, 0.08, 16), std(0x222222), 2.3, 0.48, -11.6);
+box(0.45, 0.55, 0.06, std(0x222222), 2.3, 0.8, -11.38);
+addMesh(new THREE.CylinderGeometry(0.03, 0.03, 0.4), std(0x777777, { metalness: 0.8 }), 2.3, 0.24, -11.6);
+for (let i = 0; i < 5; i++) { const a = i / 5 * Math.PI * 2; box(0.3, 0.03, 0.04, std(0x222222), 2.3 + Math.cos(a) * 0.15, 0.04, -11.6 + Math.sin(a) * 0.15).rotation.y = -a; }
+// bookshelves along the west wall
+box(0.04, 2.6, 4.0, darkWood, -0.98, 1.3, -10.8);
+for (const z of [-12.8, -8.8]) box(0.4, 2.6, 0.05, darkWood, -0.8, 1.3, z);
+for (let i = 0; i < 6; i++) box(0.4, 0.04, 4.0, darkWood, -0.8, 0.02 + i * 0.5, -10.8);
+for (let i = 0; i < 5; i++) shelfBooksZ(-12.75, -8.85, 0.04 + i * 0.5, -0.8, 0.32);
+// globe
+addMesh(new THREE.CylinderGeometry(0.15, 0.2, 0.05, 16), darkWood, 5.2, 0.03, -9.2);
+addMesh(new THREE.CylinderGeometry(0.02, 0.02, 0.75), darkWood, 5.2, 0.4, -9.2);
+const globeTex = canvasTex(256, 128, (g) => { g.fillStyle = '#2a5a9a'; g.fillRect(0, 0, 256, 128); g.fillStyle = '#4a8a3a'; for (let i = 0; i < 9; i++) { g.beginPath(); g.ellipse(rand(0, 256), rand(20, 108), rand(10, 30), rand(8, 22), rand(0, 3), 0, Math.PI * 2); g.fill(); } });
+addMesh(new THREE.SphereGeometry(0.22, 20, 14), new THREE.MeshStandardMaterial({ map: globeTex, roughness: 0.4 }), 5.2, 1.0, -9.2);
+const meridian = addMesh(new THREE.TorusGeometry(0.25, 0.01, 6, 24), std(0xc8a040, { metalness: 0.8 }), 5.2, 1.0, -9.2); meridian.rotation.y = 0.4;
+// upright piano
+box(0.6, 1.25, 1.5, std(0x111111, { roughness: 0.2 }), 5.7, 0.625, -11.0);
+box(0.25, 0.06, 1.4, std(0xf6f2ea, { roughness: 0.3 }), 5.33, 0.75, -11.0);
+for (let i = 0; i < 14; i++) if (![2, 6, 9, 13].includes(i)) box(0.13, 0.03, 0.035, std(0x111111), 5.3, 0.785, -11.62 + i * 0.09);
+const music = addMesh(new THREE.PlaneGeometry(0.35, 0.25), std(0xfffaf0, { side: THREE.DoubleSide }), 5.38, 1.05, -11.0); music.rotation.y = -Math.PI / 2; music.rotation.x = 0;
+box(0.4, 0.45, 0.8, std(0x111111, { roughness: 0.3 }), 4.95, 0.225, -11.0);
+// leather armchair and a reading lamp (off)
+const leather = std(0x5a2a1a, { roughness: 0.5 });
+box(1.0, 0.45, 0.9, leather, 0.9, 0.25, -9.5); box(1.0, 0.9, 0.2, leather, 0.9, 0.7, -9.95); box(0.15, 0.6, 0.9, leather, 0.42, 0.42, -9.5); box(0.15, 0.6, 0.9, leather, 1.38, 0.42, -9.5);
+addMesh(new THREE.CylinderGeometry(0.015, 0.015, 1.5), std(0xc8a040, { metalness: 0.8 }), 0.0, 0.75, -10.5);
+addMesh(new THREE.CylinderGeometry(0.15, 0.22, 0.25, 16, 1, true), std(0xf0e4c8, { side: THREE.DoubleSide }), 0.0, 1.55, -10.5);
+// framed certificate & a Christmas card on the wall
+box(0.6, 0.45, 0.03, std(0xb08a3a, { metalness: 0.4 }), 4.5, 1.7, -8.27); box(0.5, 0.35, 0.035, std(0xf4ead4), 4.5, 1.7, -8.28);
+fairyLights(-0.9, -8.4, 5.9, -8.4, 2.85, 26, 0.1);
+
+// Build the instanced books and fairy lights
+{
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion();
+  const books = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ roughness: 0.8 }), bookItems.length);
+  bookItems.forEach((b, i) => { m.compose(new THREE.Vector3(b.x, b.y, b.z), q, new THREE.Vector3(b.w, b.h, b.d)); books.setMatrixAt(i, m); books.setColorAt(i, b.color); });
+  scene.add(books);
+  const fairy = new THREE.InstancedMesh(new THREE.SphereGeometry(0.035, 8, 6), new THREE.MeshBasicMaterial(), fairyItems.length);
+  fairyItems.forEach((f, i) => { m.compose(new THREE.Vector3(f.x, f.y, f.z), q, new THREE.Vector3(1, 1, 1)); fairy.setMatrixAt(i, m); fairy.setColorAt(i, f.color); });
+  scene.add(fairy);
+}
+
+// Lighting
+scene.add(new THREE.HemisphereLight(0x5a6a9a, 0x20140a, 0.95));
+const moon = new THREE.DirectionalLight(0x9fb4ff, 0.45);
+moon.position.set(1, 6, 14); scene.add(moon);
+const windowGlow = new THREE.PointLight(0x7f9cff, 3, 9, 1.5);
+windowGlow.position.set(1, 2.6, 7.3); scene.add(windowGlow);
+const flashLight = new THREE.PointLight(0xffffff, 0, 30, 1.2);
+camera.add(flashLight); scene.add(camera);
+
+// Merge all static meshes into one draw call per material (much faster on phones).
+// Occluders stay behind as invisible meshes so line-of-sight raycasts still work.
+(function mergeStatic() {
+  scene.updateMatrixWorld(true);
+  const occ = new Set(occluders), groups = new Map(), remove = [];
+  scene.traverse((o) => {
+    if (!o.isMesh || o.isInstancedMesh || o.children.length || Array.isArray(o.material)) return;
+    for (let p = o; p; p = p.parent) if (p.userData.dynamic) return;
+    let g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
+    for (const name of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(name)) g.deleteAttribute(name);
+    if (!g.attributes.normal || !g.attributes.uv) return;
+    g.clearGroups(); g.applyMatrix4(o.matrixWorld);
+    let mat = o.material;
+    if (mat.userData.tiledBase) {
+      const uv = g.attributes.uv, { x: rx, y: ry } = mat.map.repeat;
+      for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * rx, uv.getY(i) * ry);
+      mat = mat.userData.tiledBase;
+    }
+    if (!groups.has(mat)) groups.set(mat, []);
+    groups.get(mat).push(g);
+    if (occ.has(o)) o.visible = false; else remove.push(o);
+  });
+  for (const o of remove) o.parent.remove(o);
+  for (const [mat, geos] of groups) { const merged = mergeGeometries(geos, false); if (merged) scene.add(new THREE.Mesh(merged, mat)); }
+})();
+
+// ---------------------------------------------------------------------------
+// Where you can walk
+// ---------------------------------------------------------------------------
+// Walkable areas for the player's centre: [minX, maxX, minZ, maxZ, floor height] ('living' = landing/stairs/floor)
+const LIVING = 'living';
+const AREAS = [
+  [-7.7, 7.7, -7.7, 7.7, LIVING],    // living room (incl. landing & stairs)
+  [-8.6, -7.4, 4.3, 7.2, 0],         // archway
+  [-16.7, -8.5, -0.7, 7.7, 0],       // kitchen & dining room
+  [2.38, 3.02, -8.6, -7.4, 0],       // study door
+  [-0.7, 5.7, -12.7, -8.5, 0],       // study
+  [-5.9, -5.3, -8.6, -7.4, 3],       // your bedroom door
+  [-8.7, -3.3, -13.7, -8.5, 3],      // your bedroom
+  [-8.6, -7.4, -6.92, -6.18, 3],     // landing → hallway
+  [-13.7, -8.5, -7.7, -5.2, 3],      // hallway
+  [-11.92, -11.28, -8.6, -7.4, 3],   // bathroom door
+  [-13.7, -9.5, -10.7, -8.5, 3],     // bathroom
+  [-11.32, -10.68, -5.4, -4.4, 3],   // parents' door
+  [-16.7, -8.5, -4.5, 1.7, 3],       // parents' bedroom
+];
+// Furniture you bump into: [minX, maxX, minZ, maxZ, floor] (no floor = every level)
+const blockers = [
+  [-1.05, 0.15, -1.8, 1.8, 0],   // sofa
+  [1.75, 2.85, -0.85, 0.85, 0],  // coffee table
+  [6.55, 8, -2.1, 2.1, 0],       // fireplace
+  [7.15, 7.75, 2.3, 3.1, 0], [7.15, 7.75, -2.8, -2.3, 0], // nutcrackers & log pile
+  [-6.07, -5.93, -5, 2.4],       // stair banister
+  [-6.1, -5.9, 2.5, 2.7],        // newel post
+  [-5.85, -5.15, 7.4, 8, 0],     // grandfather clock
+  [3.85, 4.95, 4.3, 6.25, 0],    // armchair + footstool
+  [-0.85, -0.15, -2.95, -2.25, 0], // side table
+  [-0.8, 1.8, -8, -7.55, 0],     // bookshelf
+  [7.0, 7.7, 7.0, 7.7, 0], [-3.85, -3.15, -7.75, -7.05, 0], // plants
+  // your bedroom
+  [-9, -7.5, -13.7, -11.2, 3], [-7.5, -7.0, -13.75, -13.25, 3], [-3.8, -3.0, -12.9, -11.5, 3], [-4.35, -3.8, -12.45, -11.95, 3],
+  [-3.65, -3.0, -10.15, -9.05, 3], [-4.25, -3.25, -14, -13.6, 3], [-7.35, -6.05, -8.95, -8.3, 3],
+  // kitchen
+  [-17, -16.25, -0.7, 5.45, 0], [-16.3, -12.95, -1.0, -0.28, 0], [-17, -16.08, 6.48, 7.42, 0], [-12.7, -10.3, 2.0, 5.6, 0],
+  // hallway, bathroom, parents' room
+  [-14, -13.5, -7.15, -5.85, 3], [-9.35, -8.65, -7.95, -7.25, 3],
+  [-13.8, -12.0, -11, -10.2, 3], [-9.95, -9.2, -11, -10.2, 3], [-11.5, -10.9, -11, -10.4, 3], [-13.3, -12.1, -8.95, -8.3, 3],
+  [-13.6, -11.4, -0.4, 2, 3], [-14.3, -13.6, 1.4, 2, 3], [-11.4, -10.7, 1.4, 2, 3], [-17, -16.2, 0.05, 1.55, 3], [-8.85, -8.2, -3.35, -1.65, 3],
+  [-12.7, -11.5, -4.75, -4.1, 3], [-16.5, -15.9, -1.3, -0.7, 3],
+  // study
+  [1.45, 3.15, -12.85, -11.95, 0], [2.0, 2.6, -11.9, -11.3, 0], [-1, -0.5, -12.85, -8.75, 0], [5.3, 6, -11.8, -10.2, 0],
+  [4.7, 5.25, -11.45, -10.55, 0], [4.95, 5.45, -9.45, -8.95, 0], [0.35, 1.45, -10.1, -9.0, 0], [-0.2, 0.2, -10.7, -10.3, 0], [1.0, 2.2, -8.95, -8.3, 0],
+];
+const TREE_R = 1.45;
+
+function livingFloor(x, z) {
+  if (x < -4 && z < -5) return LANDING_Y;                                // landing
+  if (x < -6 && z >= -5 && z < 3) return Math.max(0, stepH(z));           // stairs
+  return 0;
+}
+// the floor height you'd stand on at (x, z), coming from height `from` (null = can't go there)
+function walkFloor(x, z, from) {
+  for (const [a, b, c, d, f] of AREAS) {
+    if (x < a || x > b || z < c || z > d) continue;
+    const y = f === LIVING ? livingFloor(x, z) : f;
+    if (Math.abs(y - from) <= 0.3) return y;
+  }
+  return null;
+}
+function hitsBlocker(x, z, floorY, r) {
+  for (const [a, b, c, d, lvl] of blockers) {
+    if (lvl !== undefined && Math.abs(lvl - floorY) > 1.2) continue;
+    if (x > a - r && x < b + r && z > c - r && z < d + r) return true;
+  }
+  return floorY < 1 && Math.hypot(x - TREE.x, z - TREE.z) < TREE_R + r;
+}
+const stepIndexAt = (x, z) => (x < -6 && x > -8 && z >= -5 && z < 3) ? Math.floor((z + 5) / STEP_D) : -1;
+function roomOf(x, z, y = 0) {
+  if (y > 2) {
+    if (x > -8) return z < -8 ? 'bedroom' : 'living';
+    if (z < -8.1) return 'bathroom';
+    return z < -4.9 ? 'hallway' : 'parents';
+  }
+  return x < -8 ? 'kitchen' : z < -8 ? 'study' : 'living';
+}
+
+// ---------------------------------------------------------------------------
+// Presents
+// ---------------------------------------------------------------------------
+const presentColors = [[0xc41e24, 0xf2c14e], [0x1f6a38, 0xf4f1ea], [0x2a5ad4, 0xf2c14e], [0xf2c14e, 0xc41e24], [0x8a2ad4, 0xf4f1ea], [0xf4f1ea, 0xc41e24]];
+const presents = [];
+function makePresent(x, z) {
+  const g = new THREE.Group();
+  const s = rand(0.32, 0.55), h = rand(0.25, 0.45);
+  const [c, rc] = presentColors[(Math.random() * presentColors.length) | 0];
+  const ribbon = std(rc, { roughness: 0.4, metalness: 0.2 });
+  addMesh(new THREE.BoxGeometry(s, h, s * rand(0.8, 1.2)), std(c, { roughness: 0.5 }), 0, h / 2, 0, { parent: g });
+  addMesh(new THREE.BoxGeometry(s + 0.01, h + 0.01, 0.06), ribbon, 0, h / 2, 0, { parent: g });
+  addMesh(new THREE.BoxGeometry(0.06, h + 0.01, s * 1.2 + 0.01), ribbon, 0, h / 2, 0, { parent: g });
+  for (const r of [0.7, -0.7]) { const bow = addMesh(new THREE.TorusGeometry(0.06, 0.02, 8, 12), ribbon, 0, h + 0.05, 0, { parent: g }); bow.rotation.y = r; }
+  g.position.set(x, 0, z);
+  g.rotation.y = rand(0, Math.PI);
+  g.scale.setScalar(0.01);
+  scene.add(g);
+  presents.push(g);
+  return g;
+}
+
+// ---------------------------------------------------------------------------
+// Santa
+// ---------------------------------------------------------------------------
+function buildSanta() {
+  const red = std(0xc41e24, { roughness: 0.75 });
+  const white = std(0xf6f3ec, { roughness: 1 });
+  const black = std(0x141414, { roughness: 0.45 });
+  const skin = std(0xf0c09c, { roughness: 0.8 });
+  const gold = std(0xe8b830, { metalness: 0.85, roughness: 0.3 });
+  const brown = std(0x7a5230, { roughness: 1 });
+  const root = new THREE.Group();
+  const legs = [];
+  for (const s of [-1, 1]) {
+    const hip = new THREE.Group(); hip.position.set(0.17 * s, 0.85, 0); root.add(hip);
+    addMesh(new THREE.CylinderGeometry(0.14, 0.12, 0.6, 12), red, 0, -0.3, 0, { parent: hip });
+    addMesh(new THREE.CylinderGeometry(0.15, 0.15, 0.1, 12), white, 0, -0.58, 0, { parent: hip });
+    addMesh(new THREE.BoxGeometry(0.22, 0.22, 0.38), black, 0, -0.74, 0.06, { parent: hip });
+    legs.push(hip);
+  }
+  const upper = new THREE.Group(); upper.position.y = 0.85; root.add(upper);
+  const chest = addMesh(new THREE.CylinderGeometry(0.34, 0.44, 0.8, 18), red, 0, 0.38, 0, { parent: upper });
+  addMesh(new THREE.SphereGeometry(0.44, 18, 14), red, 0, 0.25, 0.05, { parent: upper }).scale.set(1, 0.9, 0.95);
+  addMesh(new THREE.TorusGeometry(0.43, 0.075, 8, 24), white, 0, 0.0, 0, { parent: upper }).rotation.x = Math.PI / 2;
+  addMesh(new THREE.CylinderGeometry(0.455, 0.455, 0.12, 24), black, 0, 0.22, 0.02, { parent: upper });
+  addMesh(new THREE.BoxGeometry(0.18, 0.15, 0.05), gold, 0, 0.22, 0.47, { parent: upper });
+  addMesh(new THREE.BoxGeometry(0.1, 0.11, 0.06), black, 0, 0.22, 0.48, { parent: upper });
+  for (const y of [0.45, 0.6]) addMesh(new THREE.SphereGeometry(0.03, 8, 8), white, 0, y, 0.39, { parent: upper });
+  addMesh(new THREE.SphereGeometry(0.36, 16, 10), red, 0, 0.76, 0, { parent: upper }).scale.set(1.15, 0.55, 0.9);
+  const arms = [];
+  for (const s of [-1, 1]) {
+    const sh = new THREE.Group(); sh.position.set(0.44 * s, 0.74, 0); sh.rotation.z = 0.18 * s; upper.add(sh);
+    addMesh(new THREE.CylinderGeometry(0.1, 0.12, 0.55, 10), red, 0, -0.27, 0, { parent: sh });
+    addMesh(new THREE.CylinderGeometry(0.13, 0.13, 0.09, 10), white, 0, -0.55, 0, { parent: sh });
+    addMesh(new THREE.SphereGeometry(0.11, 10, 10), black, 0, -0.66, 0, { parent: sh });
+    arms.push(sh);
+  }
+  const head = new THREE.Group(); head.position.y = 1.07; upper.add(head);
+  addMesh(new THREE.SphereGeometry(0.22, 18, 16), skin, 0, 0, 0, { parent: head });
+  addMesh(new THREE.SphereGeometry(0.055, 10, 10), std(0xe8908a), 0, 0.0, 0.22, { parent: head });
+  for (const s of [-1, 1]) {
+    addMesh(new THREE.SphereGeometry(0.024, 8, 8), black, 0.08 * s, 0.06, 0.195, { parent: head });
+    addMesh(new THREE.BoxGeometry(0.09, 0.025, 0.03), white, 0.08 * s, 0.11, 0.2, { parent: head });
+    addMesh(new THREE.SphereGeometry(0.075, 10, 8), white, 0.065 * s, -0.045, 0.2, { parent: head }).scale.set(1.4, 0.55, 0.7);
+    addMesh(new THREE.SphereGeometry(0.04, 8, 8), std(0xf0a090), 0.12 * s, -0.0, 0.17, { parent: head });
+  }
+  addMesh(new THREE.SphereGeometry(0.25, 16, 14), white, 0, -0.16, 0.08, { parent: head }).scale.set(1.05, 1.3, 0.75);
+  const hat = new THREE.Group(); hat.position.y = 0.12; head.add(hat);
+  addMesh(new THREE.TorusGeometry(0.21, 0.06, 8, 20), white, 0, 0, 0, { parent: hat }).rotation.x = Math.PI / 2;
+  const tip = new THREE.Group(); tip.position.y = 0.03; tip.rotation.z = -0.55; tip.rotation.x = -0.25; hat.add(tip);
+  addMesh(new THREE.ConeGeometry(0.21, 0.5, 16), red, 0, 0.25, 0, { parent: tip });
+  addMesh(new THREE.SphereGeometry(0.075, 10, 10), white, 0, 0.52, 0, { parent: tip });
+  const sack = new THREE.Group(); sack.position.set(0, 0.55, -0.5); upper.add(sack);
+  addMesh(new THREE.SphereGeometry(0.42, 14, 12), brown, 0, 0, 0, { parent: sack }).scale.set(1, 1.15, 0.85);
+  addMesh(new THREE.CylinderGeometry(0.06, 0.12, 0.16, 10), brown, 0, 0.5, 0, { parent: sack });
+  addMesh(new THREE.TorusGeometry(0.07, 0.02, 6, 12), gold, 0, 0.47, 0, { parent: sack }).rotation.x = Math.PI / 2;
+  // "?" / "!" bubble
+  const bubbleCanvas = document.createElement('canvas'); bubbleCanvas.width = bubbleCanvas.height = 128;
+  const bubbleTex = new THREE.CanvasTexture(bubbleCanvas);
+  const bubble = new THREE.Sprite(new THREE.SpriteMaterial({ map: bubbleTex, depthTest: false, transparent: true }));
+  bubble.position.y = 2.55; bubble.scale.setScalar(0.6); bubble.renderOrder = 10; root.add(bubble);
+  root.traverse((o) => { if (o.isMesh) o.userData.santa = true; });
+  scene.add(root);
+  return { root, legs, arms, upper, head, sack, chest, bubble, bubbleCanvas, bubbleTex, bubbleSym: '' };
+}
+const santa = buildSanta();
+function setBubble(sym, color) {
+  if (santa.bubbleSym === sym + color) return;
+  santa.bubbleSym = sym + color;
+  const g = santa.bubbleCanvas.getContext('2d');
+  g.clearRect(0, 0, 128, 128);
+  santa.bubble.visible = !!sym;
+  if (!sym) return;
+  g.fillStyle = 'rgba(255,255,255,0.92)'; g.beginPath(); g.arc(64, 60, 46, 0, Math.PI * 2); g.fill();
+  g.beginPath(); g.moveTo(50, 100); g.lineTo(64, 124); g.lineTo(76, 100); g.fill();
+  g.fillStyle = color; g.font = 'bold 72px Georgia'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(sym, 64, 64);
+  santa.bubbleTex.needsUpdate = true;
+}
+setBubble('', '');
+
+// Santa's to-do list for the night
+const DIFFS = {
+  easy:   { label: 'Easy',   film: 3, cos: 0.35, range: 13, gain: 75,  still: 0.12, decay: 6,   hear: 15, photo: 10,  frame: 0.6,  glance: [4.5, 8],   toward: 0.5,  speed: 1.15, dur: 1.0,  flash: 55,  stalk: false, desc: 'A sleepy Santa. Good for learning the house.' },
+  normal: { label: 'Normal', film: 3, cos: 0.22, range: 15, gain: 100, still: 0.2,  decay: 4,   hear: 18, photo: 8.5, frame: 0.5,  glance: [3.2, 6],   toward: 0.65, speed: 1.3,  dur: 0.85, flash: 80,  stalk: true,  desc: 'Sharp eyes and ears. He comes over to check out noises.' },
+  hard:   { label: 'Hard',   flashFlee: true, film: 2, cos: 0.1,  range: 17, gain: 130, still: 0.3,  decay: 2.5, hear: 21, photo: 7,   frame: 0.42, glance: [2.2, 4.5], toward: 0.8,  speed: 1.45, dur: 0.7,  flash: 100, stalk: true,  desc: 'Only 2 shots, he checks over his shoulder constantly, and a missed flash sends him up the chimney.' },
+};
+let diffKey = 'normal';
+try { const saved = localStorage.getItem('catchSantaDifficulty'); if (DIFFS[saved]) diffKey = saved; } catch (e) { /* storage unavailable */ }
+let DIFF = DIFFS[diffKey];
+
+const TREE_LABEL = 'Santa is putting presents under the tree';
+const TASKS = [
+  { type: 'present', path: [[3.9, -3.9]], face: [TREE.x, TREE.z], dur: 4.5, label: TREE_LABEL },
+  { type: 'present', path: [[2.7, -6.6], [2.7, -9.2], [3.6, -10.9]], face: [3.2, -12.2], spot: [3.55, -11.85], dur: 4.5, label: 'Santa is leaving a present in the study' },
+  { type: 'present', path: [[2.7, -9.2], [2.7, -6.8], [3.3, -5.8]], face: [TREE.x, TREE.z], dur: 4.5, label: TREE_LABEL },
+  { type: 'cookies', path: [[2.0, -1.8], [1.3, 0]], face: [2.3, 0], dur: 8.5, label: 'Santa is eating the cookies!' },
+  { type: 'carrots', path: [[1.3, 2.6], [-5, 5.6], [-9, 6.4], [-13, 6.4], [-15.6, 3.25]], face: [-17, 3.25], dur: 5, label: 'Santa went to the kitchen for the reindeer\'s carrots' },
+  { type: 'stocking', idx: 2, path: [[-13, 6.4], [-9, 6.4], [-5, 5.6], [3.5, 3.6], [6.1, 1.2]], face: [8, 1.2], dur: 3.2, label: 'Santa is filling the stockings' },
+  { type: 'stocking', idx: 1, path: [[6.1, 0]], face: [8, 0], dur: 3.2, label: 'Santa is filling the stockings' },
+  { type: 'stocking', idx: 0, path: [[6.1, -1.2]], face: [8, -1.2], dur: 3.2, label: 'Santa is filling the stockings' },
+  { type: 'present', path: [[5.7, -3.3]], face: [TREE.x, TREE.z], dur: 4.5, label: TREE_LABEL },
+  { type: 'present', path: [[7.2, -4.0]], face: [TREE.x, TREE.z], dur: 4.5, label: 'Santa is putting the last present under the tree' },
+  { type: 'leave', path: [[6.2, 0]], face: [8, 0], dur: 1.8, label: 'Santa is heading for the chimney!' },
+];
+const TOTAL_PRESENTS = TASKS.filter((t) => t.type === 'present').length;
+
+const S = {
+  scale: 0.42, chimFrom: null, resumeTimer: null,
+  pos: new THREE.Vector3(6.3, 6, 0), heading: -Math.PI / 2, headYaw: 0,
+  state: 'waiting', timer: 0, taskIdx: -1, path: [], task: null,
+  suspicion: 0, glanceTimer: rand(4, 6), glanceT: 0, glanceYaw: 0,
+  invest: null, presentsLeft: 0, rise: 0, walkPhase: 0, lean: 0, speed: 0,
+  cookiesEaten: 0, sawPlayerT: 0, jingleAcc: 0, fleeReason: '',
+};
+
+// ---------------------------------------------------------------------------
+// Audio (all synthesized)
+// ---------------------------------------------------------------------------
+let actx = null, master, noiseBuf, fireGain;
+function initAudio() {
+  if (actx) return;
+  try {
+    actx = new (window.AudioContext || window.webkitAudioContext)();
+    master = actx.createGain(); master.gain.value = 0.8; master.connect(actx.destination);
+    noiseBuf = actx.createBuffer(1, actx.sampleRate * 2, actx.sampleRate);
+    const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    const src = actx.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+    const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 420;
+    fireGain = actx.createGain(); fireGain.gain.value = 0;
+    src.connect(lp).connect(fireGain).connect(master); src.start();
+  } catch (e) { actx = null; }
+}
+function noiseBurst(dur, freq, type, vol, q = 1, delay = 0) {
+  if (!actx || vol <= 0.001) return;
+  const t = actx.currentTime + delay;
+  const s = actx.createBufferSource(); s.buffer = noiseBuf;
+  const f = actx.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q;
+  const g = actx.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0005, t + dur);
+  s.connect(f).connect(g).connect(master); s.start(t, Math.random() * 1.5); s.stop(t + dur + 0.05);
+}
+const sfxStep = (vol, wood) => noiseBurst(wood ? 0.12 : 0.08, wood ? 520 : 260, 'lowpass', vol, 1.5);
+function sfxCreak() {
+  if (!actx) return;
+  const t = actx.currentTime;
+  const o = actx.createOscillator(); o.type = 'sawtooth';
+  o.frequency.setValueAtTime(70, t); o.frequency.linearRampToValueAtTime(130, t + 0.3); o.frequency.linearRampToValueAtTime(62, t + 0.85);
+  const bp = actx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 850; bp.Q.value = 5;
+  const g = actx.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.6, t + 0.05); g.gain.linearRampToValueAtTime(0.35, t + 0.5); g.gain.exponentialRampToValueAtTime(0.001, t + 0.95);
+  const lfo = actx.createOscillator(); lfo.frequency.value = 26; const lg = actx.createGain(); lg.gain.value = 0.25; lfo.connect(lg).connect(g.gain);
+  o.connect(bp).connect(g).connect(master); o.start(t); o.stop(t + 1); lfo.start(t); lfo.stop(t + 1);
+}
+function sfxShutter() { noiseBurst(0.035, 3500, 'highpass', 0.6); noiseBurst(0.06, 2200, 'highpass', 0.4, 1, 0.07); tone(1800, 0.25, 0.05, 'square', 0.12); }
+function tone(freq, dur, vol, type = 'sine', delay = 0) {
+  if (!actx || vol <= 0.001) return;
+  const t = actx.currentTime + delay;
+  const o = actx.createOscillator(); o.type = type; o.frequency.value = freq;
+  const g = actx.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0005, t + dur);
+  o.connect(g).connect(master); o.start(t); o.stop(t + dur + 0.05);
+}
+function sfxJingle(vol) { for (let i = 0; i < 3; i++) { const f = rand(2600, 4300); tone(f, 0.3, vol, 'sine', i * 0.035 + rand(0, 0.03)); tone(f * 2.76, 0.12, vol * 0.3, 'sine', i * 0.035); } }
+function sfxSnore(vol) {
+  if (!actx) return;
+  const t = actx.currentTime, s = actx.createBufferSource(); s.buffer = noiseBuf;
+  const f = actx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 260; f.Q.value = 4;
+  const g = actx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.7); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.5);
+  const lfo = actx.createOscillator(); lfo.frequency.value = 32; const lg = actx.createGain(); lg.gain.value = vol * 0.6; lfo.connect(lg).connect(g.gain);
+  s.connect(f).connect(g).connect(master); s.start(t, Math.random()); s.stop(t + 1.6); lfo.start(t); lfo.stop(t + 1.6);
+}
+function sfxChime() { [659, 784, 988, 1319].forEach((f, i) => tone(f, 1.2, 0.12, 'triangle', i * 0.12)); }
+function sfxWhoosh() { if (!actx) return; const t = actx.currentTime; const s = actx.createBufferSource(); s.buffer = noiseBuf; const f = actx.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 2; f.frequency.setValueAtTime(300, t); f.frequency.exponentialRampToValueAtTime(3000, t + 1.2); const g = actx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.4, t + 0.3); g.gain.exponentialRampToValueAtTime(0.0005, t + 1.4); s.connect(f).connect(g).connect(master); s.start(t); s.stop(t + 1.5); }
+function say(text, pitch = 0.5, rate = 0.85, volume = 1) {
+  try { const u = new SpeechSynthesisUtterance(text); u.pitch = pitch; u.rate = rate; u.volume = volume; speechSynthesis.cancel(); speechSynthesis.speak(u); } catch (e) { /* no speech */ }
+}
+
+// ---------------------------------------------------------------------------
+// Player & input
+// ---------------------------------------------------------------------------
+const player = { x: -7.0, z: -10.6, floor: LANDING_Y, eye: LANDING_Y + 1.6, vx: 0, vz: 0, stepAcc: 0, lastStep: -1, noise: 0, bob: 0, moving: 0 };
+let yaw = -2.68, pitch = -0.1;
+let film = 3;
+let filmMax = 3;
+function showFilm() { $('filmCount').textContent = '●'.repeat(film) + '○'.repeat(Math.max(0, filmMax - film)); }
+let game = 'intro'; // intro | playing | paused | ended
+let dragLook = false; // fallback when pointer lock isn't available
+let touchMode = false; // on-screen controls for phones and tablets
+const touch = { crouch: false, run: false, mx: 0, my: 0, stickId: null, sx: 0, sy: 0, lookId: null, lx: 0, ly: 0 };
+const vibrate = (pattern) => { try { if (touchMode && navigator.vibrate) navigator.vibrate(pattern); } catch (e) { /* unsupported */ } };
+const keys = {};
+
+window.addEventListener('keydown', (e) => {
+  keys[e.code] = true;
+  if (['Space', 'ArrowUp', 'ArrowDown'].includes(e.code)) e.preventDefault();
+  if (e.code === 'Space' && game === 'playing' && !e.repeat) takePhoto();
+});
+window.addEventListener('keyup', (e) => { keys[e.code] = false; });
+window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+
+let mouseDown = null;
+document.addEventListener('mousemove', (e) => {
+  const locked = document.pointerLockElement === renderer.domElement;
+  if (game !== 'playing') return;
+  if (!locked && !(dragLook && mouseDown)) return;
+  const dx = locked ? e.movementX : e.movementX * 1.4, dy = locked ? e.movementY : e.movementY * 1.4;
+  if (mouseDown) mouseDown.moved += Math.abs(dx) + Math.abs(dy);
+  yaw -= dx * 0.0022; pitch = clamp(pitch - dy * 0.0022, -1.35, 1.35);
+});
+renderer.domElement.addEventListener('mousedown', (e) => {
+  if (game !== 'playing') return;
+  if (document.pointerLockElement === renderer.domElement) { if (e.button === 0) takePhoto(); }
+  else if (dragLook) mouseDown = { moved: 0 };
+  else lockPointer();
+});
+window.addEventListener('mouseup', () => {
+  if (dragLook && mouseDown && mouseDown.moved < 6 && game === 'playing') takePhoto();
+  mouseDown = null;
+});
+function lockPointer() {
+  try {
+    const p = renderer.domElement.requestPointerLock();
+    if (p && p.catch) p.catch(() => { dragLook = true; });
+  } catch (e) { dragLook = true; }
+}
+document.addEventListener('pointerlockerror', () => { dragLook = true; toast('Drag with the mouse to look, click to take a photo', 4); });
+document.addEventListener('pointerlockchange', () => {
+  const locked = document.pointerLockElement === renderer.domElement;
+  if (!locked && game === 'playing' && !dragLook) setPaused(true);
+});
+window.addEventListener('keydown', (e) => { if (e.code === 'Escape' && game === 'playing' && dragLook) setPaused(true); });
+
+function setPaused(p) {
+  if (p) { game = 'paused'; $('pause').classList.remove('hidden'); releaseTouches(); }
+  else { $('pause').classList.add('hidden'); game = 'playing'; if (!touchMode) lockPointer(); }
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden && game === 'playing') setPaused(true); });
+
+// ---------------------------------------------------------------------------
+// Touch controls: left half = floating joystick, right half = look, plus buttons
+// ---------------------------------------------------------------------------
+const STICK_R = 55;
+const stickEl = $('stick'), knobEl = $('knob');
+function stickHome() {
+  stickEl.style.left = (Math.max(90, window.innerWidth * 0.12)) + 'px';
+  stickEl.style.top = (window.innerHeight - 100) + 'px';
+  knobEl.style.transform = '';
+  stickEl.classList.remove('active');
+}
+stickHome();
+window.addEventListener('resize', stickHome);
+function releaseTouches() { touch.stickId = touch.lookId = null; touch.mx = touch.my = 0; stickHome(); }
+const zone = $('touchZone');
+zone.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  if (game !== 'playing') return;
+  for (const t of e.changedTouches) {
+    if (t.clientX < window.innerWidth * 0.45 && touch.stickId === null) {
+      touch.stickId = t.identifier; touch.sx = t.clientX; touch.sy = t.clientY; touch.mx = touch.my = 0;
+      stickEl.style.left = t.clientX + 'px'; stickEl.style.top = t.clientY + 'px'; stickEl.classList.add('active');
+    } else if (touch.lookId === null) {
+      touch.lookId = t.identifier; touch.lx = t.clientX; touch.ly = t.clientY;
+    }
+  }
+}, { passive: false });
+zone.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  for (const t of e.changedTouches) {
+    if (t.identifier === touch.stickId) {
+      let dx = t.clientX - touch.sx, dy = t.clientY - touch.sy;
+      const len = Math.hypot(dx, dy);
+      if (len > STICK_R) { dx *= STICK_R / len; dy *= STICK_R / len; }
+      knobEl.style.transform = `translate(${dx}px, ${dy}px)`;
+      touch.mx = dx / STICK_R; touch.my = dy / STICK_R;
+    } else if (t.identifier === touch.lookId && game === 'playing') {
+      const sens = 0.0055 * (camera.fov / 70);
+      yaw -= (t.clientX - touch.lx) * sens;
+      pitch = clamp(pitch - (t.clientY - touch.ly) * sens, -1.35, 1.35);
+      touch.lx = t.clientX; touch.ly = t.clientY;
+    }
+  }
+}, { passive: false });
+function touchEnd(e) {
+  e.preventDefault();
+  for (const t of e.changedTouches) {
+    if (t.identifier === touch.stickId) { touch.stickId = null; touch.mx = touch.my = 0; stickHome(); }
+    if (t.identifier === touch.lookId) touch.lookId = null;
+  }
+}
+zone.addEventListener('touchend', touchEnd, { passive: false });
+zone.addEventListener('touchcancel', touchEnd, { passive: false });
+function tapButton(id, fn) {
+  $(id).addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); if (game === 'playing') fn(); }, { passive: false });
+  $(id).addEventListener('click', (e) => { e.preventDefault(); if (game === 'playing' && !touchMode) fn(); });
+}
+function syncToggles() { $('btnCrouch').classList.toggle('on', touch.crouch); $('btnRun').classList.toggle('on', touch.run); }
+tapButton('btnPhoto', () => takePhoto());
+tapButton('btnCrouch', () => { touch.crouch = !touch.crouch; if (touch.crouch) touch.run = false; syncToggles(); });
+tapButton('btnRun', () => { touch.run = !touch.run; if (touch.run) touch.crouch = false; syncToggles(); });
+tapButton('btnPause', () => setPaused(true));
+
+function blocked(x, z) {
+  const f = walkFloor(x, z, player.floor);
+  return f === null || hitsBlocker(x, z, f, 0.28);
+}
+
+function updatePlayer(dt) {
+  const crouch = !!keys.KeyC || touch.crouch;
+  const sprint = (!!(keys.ShiftLeft || keys.ShiftRight) || touch.run) && !crouch;
+  let fwd = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0);
+  let str = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0);
+  if (Math.hypot(touch.mx, touch.my) > 0.15) { fwd -= touch.my; str += touch.mx; } // analog stick: push further to go faster
+  const fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
+  let dx = fx * fwd + rx * str, dz = fz * fwd + rz * str;
+  const len = Math.hypot(dx, dz);
+  const speed = crouch ? 1.25 : sprint ? 4.3 : 2.4;
+  if (len > 1) { dx /= len; dz /= len; }
+  const k = 1 - Math.exp(-dt * 12);
+  player.vx = lerp(player.vx, dx * speed, k);
+  player.vz = lerp(player.vz, dz * speed, k);
+  const ox = player.x, oz = player.z;
+  const nx = player.x + player.vx * dt, nz = player.z + player.vz * dt;
+  if (!blocked(nx, player.z)) { player.x = nx; player.floor = walkFloor(player.x, player.z, player.floor); } else player.vx = 0;
+  if (!blocked(player.x, nz)) { player.z = nz; player.floor = walkFloor(player.x, player.z, player.floor); } else player.vz = 0;
+  const moved = Math.hypot(player.x - ox, player.z - oz);
+  player.moving = moved / dt;
+
+  // footsteps
+  const onStairs = stepIndexAt(player.x, player.z) >= 0 || player.floor > 0;
+  player.stepAcc += moved;
+  const stride = crouch ? 0.5 : sprint ? 1.0 : 0.72;
+  if (player.stepAcc > stride) {
+    player.stepAcc = 0;
+    const loud = crouch ? 0.6 : sprint ? 13 : 3.2;
+    const wood = onStairs;
+    sfxStep(crouch ? 0.02 : sprint ? 0.32 : 0.12, wood);
+    makeNoise(loud * (wood && !crouch ? 1.3 : 1), sprint ? 0.35 : 0);
+  }
+  player.bob += moved * (sprint ? 2.8 : 3.4);
+
+  // creaky steps
+  const si = stepIndexAt(player.x, player.z);
+  if (si !== player.lastStep) {
+    if (CREAKY.includes(si) && Math.abs(player.x + 7) < 0.42) {
+      sfxCreak();
+      makeNoise(48, 0.65);
+      vibrate([60, 40, 90]);
+      toast('<b>CREEEAK!</b>', 1.6);
+    }
+    player.lastStep = si;
+  }
+
+  player.noise = Math.max(0, player.noise - dt * 35);
+  const targetEye = player.floor + (crouch ? 1.0 : 1.62) + Math.sin(player.bob) * (player.moving > 0.3 ? (sprint ? 0.06 : 0.035) : 0);
+  player.eye = lerp(player.eye, targetEye, 1 - Math.exp(-dt * 10));
+  player.crouch = crouch; player.sprint = sprint;
+}
+
+function makeNoise(amount, minHear) {
+  player.noise = clamp(player.noise + amount * 2.2, 0, 100);
+  disturbParents(amount);
+  const d = Math.hypot(S.pos.x - player.x, S.pos.z - player.z);
+  if (!santaPresent()) return;
+  const muffle = roomOf(player.x, player.z, player.floor) === roomOf(S.pos.x, S.pos.z) ? 1 : 0.5;
+  const f = Math.max(clamp(1 - d / DIFF.hear, 0, 1), minHear) * muffle;
+  const add = amount * f;
+  if (add <= 0) return;
+  S.suspicion += add;
+  if (add > 7 && canReact()) startInvestigate(player.x, player.z, 2.6);
+}
+
+// Making noise near your sleeping parents wakes them up
+let parentWake = 0, parentWarned = false;
+function disturbParents(amount) {
+  const room = roomOf(player.x, player.z, player.floor);
+  const k = room === 'parents' ? 2.2 : room === 'hallway' ? 0.5 : 0;
+  if (!k) return;
+  parentWake += amount * k;
+  if (parentWake > 45 && !parentWarned) { parentWarned = true; warn('Dad is stirring… tiptoe!', 2.2); say('Mmmph… hmm?', 0.3, 0.7, 0.6); }
+  if (parentWake >= 100) loseParents();
+}
+function updateParents(dt) {
+  parentWake = Math.max(0, parentWake - dt * 10);
+  if (parentWake < 20) parentWarned = false;
+  if (filmPickup.visible && player.floor > 2 && Math.hypot(player.x - filmPickup.position.x, player.z - filmPickup.position.z) < 1.2) {
+    filmPickup.visible = false; film++; filmMax = Math.max(filmMax, film); showFilm();
+    sfxChime(); toast('Found a roll of film in Dad\'s camera bag! <b>+1 shot</b>', 3);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Santa behaviour
+// ---------------------------------------------------------------------------
+const santaPresent = () => ['arrive', 'walk', 'task', 'flee'].includes(S.state) || (S.state === 'chimney' && S.pos.y < 0.6);
+const canReact = () => ['walk', 'task', 'arrive'].includes(S.state);
+
+function startInvestigate(x, z, t) {
+  if (!S.invest) {
+    tone(220, 0.35, 0.05, 'triangle');
+    if (Math.random() < 0.5) say(['Hmm?', 'Hm? Who\'s there?', 'Hmmm…'][(Math.random() * 3) | 0], 0.4, 0.8, 0.6);
+    S.invest = { x, z, t, home: S.pos.clone(), walked: 0 };
+  } else Object.assign(S.invest, { x, z, t: Math.max(S.invest.t, t) });
+}
+const santaCanStand = (x, z) => walkFloor(x, z, 0) === 0 && !hitsBlocker(x, z, 0, 0.35);
+function endInvestigate() {
+  const inv = S.invest; S.invest = null;
+  S.glanceTimer = Math.min(S.glanceTimer, 1.2); // double take
+  if (inv && inv.walked > 0.1 && S.state !== 'flee') {
+    // walk back to where he was before carrying on
+    if (S.state === 'task') { S.resumeTimer = S.timer; S.state = 'walk'; S.path = []; }
+    S.path.unshift(inv.home);
+  }
+}
+
+function startTask(i) {
+  S.taskIdx = i;
+  S.task = TASKS[i];
+  S.path = S.task.path.map(([x, z]) => new THREE.Vector3(x, 0, z));
+  S.state = 'walk';
+  $('santaDoing').textContent = S.task.label;
+}
+
+function santaSpots() {
+  // forward vector of Santa's eyes
+  const h = S.heading + S.headYaw;
+  return new THREE.Vector3(Math.sin(h), 0, Math.cos(h));
+}
+
+const raycaster = new THREE.Raycaster();
+let losTimer = 0, losClear = false;
+function lineOfSight(from, to) {
+  const dir = to.clone().sub(from); const d = dir.length(); dir.normalize();
+  raycaster.set(from, dir); raycaster.far = d - 0.2;
+  return raycaster.intersectObjects(occluders, false).length === 0;
+}
+
+function updateSanta(dt) {
+  if (S.state === 'waiting' || S.state === 'gone' || S.state === 'caught') return;
+  let desired = S.heading, moveSpeed = 0;
+
+  if (S.state === 'arrive') {
+    // drops down inside the chimney (shrunk to fit), then steps out of the fireplace
+    S.timer -= dt;
+    if (S.pos.y > 0) S.pos.y = Math.max(0, S.pos.y - dt * 4);
+    else { S.pos.x = Math.max(6.5, S.pos.x - dt * 1.5); S.scale = Math.min(1, S.scale + dt * 1.2); }
+    if (S.pos.y < 3.4) santa.root.visible = true;
+    if (S.timer <= 0 && S.scale >= 1) startTask(0);
+  }
+
+  // investigating pauses everything
+  if (S.invest && canReact()) {
+    S.invest.t -= dt;
+    desired = Math.atan2(S.invest.x - S.pos.x, S.invest.z - S.pos.z);
+    S.headYaw = lerp(S.headYaw, 0, 1 - Math.exp(-dt * 6));
+    const dx = S.invest.x - S.pos.x, dz = S.invest.z - S.pos.z, d = Math.hypot(dx, dz);
+    if (DIFF.stalk && S.state !== 'arrive' && S.suspicion > 45 && S.invest.walked < 3 && d > 1.6 && Math.abs(angleDiff(S.heading, desired)) < 0.5
+        && roomOf(S.invest.x, S.invest.z, player.floor) === roomOf(S.pos.x, S.pos.z)) {
+      const step = 0.9 * dt, nx = S.pos.x + dx / d * step, nz = S.pos.z + dz / d * step;
+      if (santaCanStand(nx, nz)) { S.pos.x = nx; S.pos.z = nz; S.invest.walked += step; moveSpeed = 0.9; }
+    }
+    if (S.invest.t <= 0) endInvestigate();
+  } else if (S.state === 'walk' || S.state === 'flee') {
+    const tgt = S.path[0];
+    const dx = tgt.x - S.pos.x, dz = tgt.z - S.pos.z, d = Math.hypot(dx, dz);
+    moveSpeed = S.state === 'flee' ? 4.2 + DIFF.speed - 1.15 : DIFF.speed;
+    if (d < 0.08) {
+      S.path.shift();
+      if (!S.path.length) {
+        if (S.state === 'flee') { S.state = 'chimney'; S.rise = 0; S.timer = 0.5; }
+        else { S.state = 'task'; if (S.resumeTimer != null) { S.timer = S.resumeTimer; S.resumeTimer = null; } else { S.timer = S.task.dur * DIFF.dur; S.taskElapsed = 0; } }
+      }
+      moveSpeed = 0;
+    } else {
+      desired = Math.atan2(dx, dz);
+      const step = Math.min(d, moveSpeed * dt * clamp(1 - Math.abs(angleDiff(S.heading, desired)) / 1.5, 0.15, 1));
+      S.pos.x += dx / d * step; S.pos.z += dz / d * step;
+      S.jingleAcc += step;
+      if (S.jingleAcc > 0.6) { S.jingleAcc = 0; const pd = Math.hypot(S.pos.x - player.x, S.pos.z - player.z); sfxJingle(0.05 * clamp(1.4 - pd / 14, 0.1, 1)); }
+    }
+    // glances while walking: head only
+    if (S.state === 'walk') S.headYaw = lerp(S.headYaw, S.glanceT > 0 ? clamp(S.glanceYaw, -1.1, 1.1) : 0, 1 - Math.exp(-dt * 4));
+    else S.headYaw = lerp(S.headYaw, 0, 1 - Math.exp(-dt * 6));
+  } else if (S.state === 'task') {
+    const [fx, fz] = S.task.face;
+    desired = Math.atan2(fx - S.pos.x, fz - S.pos.z);
+    if (S.glanceT > 0) desired += S.glanceYaw; // turns around to look
+    S.headYaw = lerp(S.headYaw, 0, 1 - Math.exp(-dt * 4));
+    if (S.glanceT <= 0) {
+      S.timer -= dt; S.taskElapsed += dt;
+      if (S.task.type === 'cookies') {
+        const n = Math.min(cookies.length, Math.floor(S.taskElapsed / 2));
+        while (S.cookiesEaten < n) { cookies[S.cookiesEaten].visible = false; S.cookiesEaten++; tone(140, 0.08, 0.04, 'triangle'); }
+        milk.scale.y = clamp(1 - S.taskElapsed / S.task.dur, 0.05, 1); milk.position.y = 0.5 + 0.065 * milk.scale.y;
+      } else if (S.task.type === 'carrots') {
+        const n = Math.min(carrots.length, Math.floor(S.taskElapsed / 1.4));
+        carrots.forEach((c, i) => { if (i < n && c.visible) { c.visible = false; tone(300, 0.06, 0.03, 'triangle'); } });
+      }
+    }
+    if (S.timer <= 0) finishTask();
+  } else if (S.state === 'chimney') {
+    S.timer -= dt;
+    if (S.timer <= 0) {
+      if (S.rise === 0) { sfxWhoosh(); say('Ho ho ho! Merry Christmas!', 0.4, 0.85, 0.8); spawnSparkles(); S.chimFrom = S.pos.clone(); }
+      S.rise = Math.min(1, S.rise + dt / 1.7);
+      // 1) step back into the fireplace, shrinking to fit inside the chimney
+      const enter = clamp(S.rise / 0.4, 0, 1), e = enter * enter * (3 - 2 * enter);
+      S.pos.x = lerp(S.chimFrom.x, 7.55, e); S.pos.z = lerp(S.chimFrom.z, 0, e);
+      S.scale = lerp(1, 0.42, e);
+      // 2) zoom straight up behind the bricks
+      const up = clamp((S.rise - 0.4) / 0.6, 0, 1);
+      S.pos.y = up * up * 6;
+      if (S.pos.y > 2.6) santa.root.visible = false;
+      if (S.rise >= 1) { S.state = 'gone'; santa.root.visible = false; setTimeout(() => lose(), 600); }
+    }
+    desired = -Math.PI / 2; // faces the room as he goes
+  }
+
+  // glance timer
+  if (canReact() && !S.invest) {
+    if (S.glanceT > 0) S.glanceT -= dt;
+    else if ((S.glanceTimer -= dt) <= 0) {
+      S.glanceTimer = rand(DIFF.glance[0], DIFF.glance[1]);
+      S.glanceT = rand(1.3, 2.0);
+      // Santa has a sixth sense: often glances toward you
+      const toPlayer = angleDiff(S.state === 'task' ? Math.atan2(S.task.face[0] - S.pos.x, S.task.face[1] - S.pos.z) : S.heading, Math.atan2(player.x - S.pos.x, player.z - S.pos.z));
+      S.glanceYaw = Math.random() < DIFF.toward ? toPlayer + rand(-0.4, 0.4) : rand(-2.4, 2.4);
+    }
+  }
+
+  S.heading += clamp(angleDiff(S.heading, desired), -dt * (S.state === 'chimney' ? 8 : 4.5), dt * (S.state === 'chimney' ? 8 : 4.5));
+  S.speed = moveSpeed;
+
+  // --- vision ---
+  if (santaPresent() && S.state !== 'flee' && S.state !== 'chimney') {
+    const eye = new THREE.Vector3(S.pos.x, S.pos.y + 1.85, S.pos.z);
+    const pp = new THREE.Vector3(player.x, player.eye - 0.25, player.z);
+    const to = pp.clone().sub(eye); const d = to.length();
+    const flat = new THREE.Vector3(to.x, 0, to.z).normalize();
+    const cos = flat.dot(santaSpots());
+    losTimer -= dt;
+    if (losTimer <= 0) { losTimer = 0.1; losClear = lineOfSight(eye, pp); }
+    const inCone = cos > DIFF.cos && d < DIFF.range;
+    if (inCone && losClear) {
+      const f = Math.pow(clamp(1 - d / DIFF.range, 0, 1), 0.7);
+      const mv = player.moving < 0.2 ? DIFF.still : player.sprint ? 1.8 : 1;
+      const rate = (DIFF.gain * f * mv * (player.crouch ? 0.5 : 1)) + (d < 2.6 ? 50 : 0);
+      S.suspicion += rate * dt;
+      S.sawPlayerT = 0.3;
+      if (S.suspicion > 35 && canReact()) startInvestigate(player.x, player.z, 2.2);
+    } else {
+      S.sawPlayerT -= dt;
+      if (!S.invest) S.suspicion = Math.max(0, S.suspicion - dt * DIFF.decay);
+    }
+    if (S.suspicion >= 100) flee();
+  }
+  S.suspicion = clamp(S.suspicion, 0, 100);
+
+  // bubble
+  if (S.state === 'flee' || (S.state === 'chimney' && S.rise === 0)) setBubble('!', '#d42a2f');
+  else if (S.state === 'chimney') setBubble('', '');
+  else if (S.invest || S.suspicion > 35) setBubble('?', S.suspicion > 65 ? '#e0602a' : '#c89a10');
+  else setBubble('', '');
+  santa.bubble.scale.setScalar(0.45 + S.suspicion / 250);
+}
+
+function finishTask() {
+  const t = S.task;
+  if (t.type === 'present') {
+    const away = new THREE.Vector3(S.pos.x - TREE.x, 0, S.pos.z - TREE.z).normalize();
+    const p = t.spot ? makePresent(t.spot[0], t.spot[1]) : makePresent(TREE.x + away.x * 1.15 + rand(-0.2, 0.2), TREE.z + away.z * 1.15 + rand(-0.2, 0.2));
+    p.userData.grow = 0;
+    S.presentsLeft++;
+    santa.sack.scale.setScalar(1 - S.presentsLeft / (TOTAL_PRESENTS + 2));
+    tone(520, 0.2, 0.03, 'triangle');
+  } else if (t.type === 'stocking') {
+    const st = stockings[t.idx]; st.filled = true; st.stuff.visible = true; st.g.scale.set(1, 1, 1.25);
+  }
+  if (t.type === 'leave') { S.state = 'chimney'; S.rise = 0; S.timer = 0.6; S.fleeReason = 'finished'; $('santaDoing').textContent = 'Santa is going up the chimney!'; return; }
+  startTask(S.taskIdx + 1);
+}
+
+function fleePath() {
+  let { x, z } = S.pos; const p = [];
+  if (x < -7.5) { if (x < -12.8) p.push([-13, 6.4]); p.push([-9, 6.4], [-5, 5.6], [3.5, 3.6]); z = 3.6; }
+  else if (z < -8) { p.push([2.7, -9.2], [2.7, -6.8], [3.2, -2.2]); z = -2.2; }
+  else if (x < 3.2) {
+    if (x > -1.3 && z > -2.1 && z < 2.1) p.push([x, z < 0 ? -2.2 : 2.4]); // get out from between the sofa and table
+    p.push(z < 0 ? [3.2, -2.2] : [3.5, 3.6]);
+  }
+  p.push([6.2, z > 0 ? 0.6 : -0.6], [6.3, 0]);
+  return p.map(([a, b]) => new THREE.Vector3(a, 0, b));
+}
+
+function flee() {
+  if (S.state === 'flee' || S.state === 'chimney') return;
+  S.state = 'flee'; S.invest = null; S.fleeReason = 'spotted';
+  S.path = fleePath();
+  say('Oh! Ho ho!', 0.5, 1.2, 1);
+  sfxJingle(0.15); sfxJingle(0.12);
+  $('santaDoing').textContent = 'Santa spotted you! He\'s making a run for it!';
+  warn('He saw you! Quick, take the picture!', 2.5);
+  vibrate(250);
+}
+
+// Pose & animate Santa's body
+function animateSanta(dt, time) {
+  const r = santa.root;
+  r.position.copy(S.pos);
+  r.rotation.y = S.heading;
+  r.scale.setScalar(S.scale);
+  santa.head.rotation.y = clamp(S.headYaw, -1.1, 1.1);
+  let legSwing = 0, armL = 0, armR = 0, lean = 0, bob = 0;
+  if (S.speed > 0) {
+    S.walkPhase += dt * S.speed * 5.5;
+    legSwing = Math.sin(S.walkPhase) * (S.state === 'flee' ? 0.8 : 0.45);
+    armL = -legSwing * 0.8; armR = legSwing * 0.8;
+    bob = Math.abs(Math.sin(S.walkPhase)) * 0.05;
+  } else {
+    bob = Math.sin(time * 2) * 0.01;
+  }
+  if (S.state === 'task' && S.glanceT <= 0 && !S.invest) {
+    const t = S.task.type;
+    if (t === 'present') { lean = 0.55; armL = armR = -1.0 + Math.sin(time * 3) * 0.1; }
+    else if (t === 'carrots') { lean = 0.25; armR = -1.3 + Math.sin(time * 4) * 0.25; armL = -0.5; }
+    else if (t === 'cookies') { const c = (Math.sin(time * 3.2) + 1) / 2; armR = -0.6 - c * 1.9; armL = -0.4; santa.head.rotation.x = c * 0.15; }
+    else if (t === 'stocking') { armL = armR = -1.4 + Math.sin(time * 8) * 0.15; }
+    else if (t === 'leave') { armR = -2.6; lean = -0.05; }
+  } else santa.head.rotation.x = 0;
+  if (S.state === 'chimney') { armR = -2.6; armL = 0.2; }
+  if (S.invest) { armL = armR = -0.25; lean = -0.08; }
+  const k = 1 - Math.exp(-dt * 8);
+  santa.legs[0].rotation.x = lerp(santa.legs[0].rotation.x, legSwing, k);
+  santa.legs[1].rotation.x = lerp(santa.legs[1].rotation.x, -legSwing, k);
+  santa.arms[0].rotation.x = lerp(santa.arms[0].rotation.x, armR, k); // right arm (-x side)
+  santa.arms[1].rotation.x = lerp(santa.arms[1].rotation.x, armL, k);
+  santa.arms[0].rotation.z = lerp(santa.arms[0].rotation.z, S.state === 'chimney' || (S.task && S.task.type === 'leave' && S.state === 'task') ? 0.5 : -0.18, k);
+  S.lean = lerp(S.lean, lean, k);
+  santa.upper.rotation.x = S.lean;
+  santa.upper.position.y = 0.85 + bob;
+}
+
+// Gold sparkles when Santa zooms up the chimney
+let sparkles = null;
+function spawnSparkles() {
+  const n = 160, g = new THREE.BufferGeometry(), p = new Float32Array(n * 3), v = [];
+  for (let i = 0; i < n; i++) { p[i * 3] = 7.0 + rand(-0.3, 0.3); p[i * 3 + 1] = rand(0.2, 2); p[i * 3 + 2] = rand(-0.5, 0.5); v.push([rand(-1.5, 0.5), rand(0.5, 3), rand(-1.5, 1.5)]); }
+  g.setAttribute('position', new THREE.BufferAttribute(p, 3));
+  sparkles = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffd860, size: 0.07, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+  sparkles.userData = { v, life: 2.2 };
+  scene.add(sparkles);
+}
+
+// ---------------------------------------------------------------------------
+// Camera / photo
+// ---------------------------------------------------------------------------
+function santaTarget() { return santa.chest.getWorldPosition(new THREE.Vector3()); }
+function photoCheck() {
+  if (!santa.root.visible || S.state === 'waiting' || (S.state === 'chimney' && S.pos.y > 0.6)) return { ok: false, why: 'Santa isn\'t in the shot!' };
+  const tgt = santaTarget();
+  const d = camera.position.distanceTo(tgt);
+  const ndc = tgt.clone().project(camera);
+  if (ndc.z > 1 || Math.abs(ndc.x) > DIFF.frame || Math.abs(ndc.y) > DIFF.frame + 0.15) return { ok: false, why: 'Missed! Santa wasn\'t in the frame.' };
+  if (d > DIFF.photo) return { ok: false, why: 'Too far away — the photo is just a blurry red smudge.', d };
+  if (!lineOfSight(camera.position.clone(), tgt) && !lineOfSight(camera.position.clone(), santa.head.getWorldPosition(new THREE.Vector3()))) return { ok: false, why: 'Something was in the way!', d };
+  return { ok: true, d };
+}
+
+let flashT = 0;
+function takePhoto() {
+  if (game !== 'playing') return;
+  if (film <= 0) { toast('Out of film! Run and hug him?', 1.6); tone(200, 0.15, 0.06, 'square'); return; }
+  film--;
+  showFilm();
+  sfxShutter();
+  vibrate(35);
+  const res = photoCheck();
+  flashLight.intensity = 60;
+  camera.updateMatrixWorld();
+  renderer.render(scene, camera);
+  const img = renderer.domElement.toDataURL('image/jpeg', 0.85);
+  flashT = 0.35; $('flash').style.opacity = 0.9;
+  if (res.ok) { win(img, res.d, 'photo'); return; }
+  toast(res.why + (film ? '' : ' (No film left!)'), 2.2);
+  disturbParents(40);
+  // a camera flash in the dark is hard to miss
+  if (santaPresent()) {
+    const d = Math.hypot(S.pos.x - player.x, S.pos.z - player.z);
+    S.suspicion += DIFF.flash * Math.max(clamp(1 - d / 16, 0, 1), 0.5);
+    if (DIFF.flashFlee && (d < 12 || roomOf(player.x, player.z, player.floor) === roomOf(S.pos.x, S.pos.z))) S.suspicion = 100;
+    if (S.suspicion >= 100) { S.suspicion = 100; flee(); }
+    if (canReact()) startInvestigate(player.x, player.z, 2.5);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// HUD helpers
+// ---------------------------------------------------------------------------
+let toastT = 0, warnT = 0;
+function toast(html, t = 2) { $('toast').innerHTML = html; $('toast').style.opacity = 1; toastT = t; }
+function warn(text, t = 1.5) { $('warn').textContent = text; $('warn').style.opacity = 1; warnT = t; }
+const hints = { seen: false, close: false };
+
+function updateHUD(dt) {
+  $('noiseFill').style.width = player.noise + '%';
+  $('susFill').style.width = S.suspicion + '%';
+  $('presentCount').textContent = S.presentsLeft;
+  if ((toastT -= dt) <= 0) $('toast').style.opacity = 0;
+  if ((warnT -= dt) <= 0) $('warn').style.opacity = 0;
+  if (S.invest && S.state !== 'flee' && warnT <= 0) { $('warn').textContent = 'Santa heard something… FREEZE!'; $('warn').style.opacity = 1; }
+  // viewfinder lights up when a good shot is possible
+  const res = santaPresent() ? photoCheck() : { ok: false };
+  $('viewfinder').classList.toggle('lock', !!res.ok);
+  if (!hints.seen && santaPresent() && S.state !== 'arrive') {
+    const ndc = santaTarget().project(camera);
+    if (ndc.z < 1 && Math.abs(ndc.x) < 1 && Math.abs(ndc.y) < 1 && lineOfSight(camera.position.clone(), santaTarget())) { hints.seen = true; toast('There he is! Get within range — the viewfinder turns <span style="color:#7dff8a">green</span> when the shot is good.', 4.5); }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Game flow
+// ---------------------------------------------------------------------------
+function startGame(e) {
+  initAudio();
+  if (actx && actx.state === 'suspended') actx.resume();
+  $('intro').classList.add('hidden');
+  $('hud').classList.remove('hidden');
+  game = 'playing';
+  touchMode = e && e.pointerType ? (e.pointerType === 'touch' || e.pointerType === 'pen') : isCoarse;
+  if (touchMode) {
+    document.body.classList.add('touch');
+    $('touchUI').classList.remove('hidden');
+    $('viewfinder').style.width = '40vmin'; $('viewfinder').style.height = '30vmin';
+    stickHome();
+    try {
+      const fs = document.documentElement.requestFullscreen && document.documentElement.requestFullscreen({ navigationUI: 'hide' });
+      if (fs && fs.then) fs.then(() => { try { screen.orientation.lock('landscape').catch(() => {}); } catch (err) { /* not supported */ } }).catch(() => {});
+    } catch (err) { /* fullscreen not allowed here */ }
+    if (window.innerHeight > window.innerWidth) setTimeout(() => toast('Tip: turn your phone sideways for a wider view', 3), 4200);
+  } else lockPointer();
+  // Santa lands in the fireplace
+  S.state = 'arrive'; S.timer = 2.4; S.pos.set(7.55, 4.5, 0); S.scale = 0.42; santa.root.visible = false;
+  film = filmMax = DIFF.film; showFilm();
+  sfxJingle(0.06); setTimeout(() => sfxJingle(0.05), 300);
+  setTimeout(() => toast('<i>…jingle… jingle…</i> Someone\'s downstairs!', 3), 800);
+}
+$('startBtn').addEventListener('click', startGame);
+function pickDifficulty(k) {
+  diffKey = k; DIFF = DIFFS[k];
+  document.querySelectorAll('.dbtn').forEach((b) => b.classList.toggle('sel', b.dataset.d === k));
+  $('diffDesc').textContent = DIFF.desc;
+  try { localStorage.setItem('catchSantaDifficulty', k); } catch (e) { /* storage unavailable */ }
+}
+document.querySelectorAll('.dbtn').forEach((b) => b.addEventListener('click', () => pickDifficulty(b.dataset.d)));
+pickDifficulty(diffKey);
+if (isCoarse) $('startBtn').textContent = 'Tap to tiptoe downstairs';
+$('resumeBtn').addEventListener('click', () => setPaused(false));
+$('againBtn').addEventListener('click', () => location.reload());
+
+function endGame() {
+  game = 'ended';
+  if (document.pointerLockElement) document.exitPointerLock();
+  $('hud').classList.add('hidden');
+  $('touchUI').classList.add('hidden');
+  releaseTouches();
+  $('end').classList.remove('hidden');
+}
+
+function win(img, d, how) {
+  const unaware = S.state !== 'flee' && S.state !== 'chimney' && S.suspicion < 40;
+  let stars = 1, caption;
+  if (how === 'hug') { stars = unaware ? 3 : 2; caption = 'Best. Hug. Ever.'; }
+  else if (S.state === 'flee' || S.state === 'chimney') { stars = 1; caption = 'Santa, mid-escape!'; }
+  else { stars = (unaware && d < 5.5) ? 3 : (d < 7.5 || unaware) ? 2 : 1; caption = unaware ? 'Caught red-handed!' : 'Santa looking surprised!'; }
+  S.state = 'caught';
+  sfxChime();
+  setTimeout(() => say('Ho ho ho! You caught me! Merry Christmas!', 0.45, 0.85, 1), 500);
+  $('endTitle').textContent = how === 'hug' ? 'You caught Santa! 🤗' : 'You caught Santa! 📸';
+  $('endPhoto').innerHTML = `<div class="polaroid"><img src="${img}" alt="Your photo of Santa"><div class="cap">${caption}</div></div>`;
+  $('endStars').textContent = '★'.repeat(stars) + '☆'.repeat(3 - stars);
+  const tips = stars === 3 ? 'A perfect sneak — he never knew you were there.' : stars === 2 ? 'Nice shot! For 3 stars, get close while he\'s busy and unaware.' : 'Got him! For more stars, get closer and stay unseen.';
+  $('endText').innerHTML = `${tips}<br>Presents left: <b>${S.presentsLeft}</b> 🎁 · Difficulty: <b>${DIFF.label}</b>`;
+  endGame();
+}
+
+function loseParents() {
+  if (game !== 'playing') return;
+  say('What are you doing up? Back to bed!', 0.6, 1.0, 1);
+  $('endTitle').textContent = 'Dad woke up! 😴';
+  $('endPhoto').innerHTML = '';
+  $('endStars').textContent = '☆☆☆';
+  $('endText').innerHTML = 'You made too much noise in your parents\' room and got sent straight back to bed.<br>Crouch and tiptoe near sleeping grown-ups!';
+  endGame();
+}
+
+function lose() {
+  if (game === 'ended') return;
+  const spotted = S.fleeReason === 'spotted';
+  $('endTitle').textContent = 'Santa got away! 🎅💨';
+  $('endPhoto').innerHTML = '';
+  $('endStars').textContent = '☆☆☆';
+  $('endText').innerHTML = (spotted
+    ? 'He spotted you and zipped up the chimney with a wink.<br>Crouch, keep out of his sight, and freeze when he turns around.'
+    : 'He finished his rounds and vanished up the chimney before you could get a picture.<br>Move a little faster, but mind the creaky steps!')
+    + `<br><br>At least he left <b>${S.presentsLeft}</b> present${S.presentsLeft === 1 ? '' : 's'} under the tree 🎁 and the stockings are ${stockings.filter((s) => s.filled).length ? 'stuffed' : 'still empty'}.`;
+  endGame();
+}
+
+// ---------------------------------------------------------------------------
+// Main loop
+// ---------------------------------------------------------------------------
+let last = performance.now(), time = 0, crackleT = 0, timeScale = 1, trainAngle = 0, snoreT = 2;
+function loop(now) {
+  const dt = Math.min(0.05, (now - last) / 1000) * timeScale; last = now; time += dt;
+
+  if (game === 'playing') {
+    updatePlayer(dt);
+    updateParents(dt);
+    updateSanta(dt);
+    // hugging Santa counts too
+    if (santaPresent() && Math.hypot(S.pos.x - player.x, S.pos.z - player.z) < 0.95 && S.pos.y < 1) {
+      camera.position.set(player.x, player.eye, player.z); camera.rotation.set(pitch, yaw, 0);
+      renderer.render(scene, camera);
+      win(renderer.domElement.toDataURL('image/jpeg', 0.85), 0.9, 'hug');
+    }
+  }
+  if (game === 'playing' || game === 'intro' || game === 'ended') animateSanta(dt, time);
+  if (game === 'playing') updateHUD(dt);
+
+  // ambience
+  for (const f of flames) {
+    const s = f.userData.seed;
+    f.scale.set(1, 0.7 + Math.sin(time * 9 + s) * 0.2 + Math.sin(time * 23 + s * 2) * 0.1, 1);
+    f.position.y = f.userData.base + Math.sin(time * 7 + s) * 0.03;
+  }
+  fireLight.intensity = 20 + Math.sin(time * 11) * 2.5 + Math.sin(time * 27) * 1.5 + rand(-1, 1);
+  for (const m of bulbMats) m.emissiveIntensity = 1.3 + Math.sin(time * 1.6 + m.userData.seed) * 1.0;
+  trainAngle += dt * 0.32;
+  train.forEach((g, i) => { const a = trainAngle - i * 0.24; g.position.set(TREE.x + Math.cos(a) * TRACK_R, 0.02, TREE.z + Math.sin(a) * TRACK_R); g.rotation.y = -a - Math.PI / 2; });
+  catBody.scale.y = 0.6 + Math.sin(time * 1.8) * 0.03;
+  sleepers.forEach((l, i) => { l.scale.y = 0.35 + Math.sin(time * 1.1 + i * 2) * 0.03; });
+  filmMat.emissiveIntensity = 0.5 + Math.sin(time * 4) * 0.4;
+  if (actx && game === 'playing' && player.floor > 2 && (snoreT -= dt) <= 0) {
+    snoreT = 3.4;
+    const sd = Math.hypot(player.x - PB, player.z - 0.8);
+    const sv = clamp(1 - sd / 10, 0, 1) * (roomOf(player.x, player.z, player.floor) === 'parents' ? 1 : 0.35);
+    if (sv > 0.02) sfxSnore(sv * 0.5);
+  }
+  star.rotation.y += dt * 0.4;
+  pendulum.rotation.z = Math.sin(time * Math.PI) * 0.25;
+  for (const sn of snowSystems) {
+    const sp = sn.pts.geometry.attributes.position;
+    for (let i = 0; i < sn.n; i++) {
+      let y = sp.getY(i) - dt * (0.4 + (i % 7) * 0.06);
+      if (y < sn.y0) y = sn.y1;
+      sp.setY(i, y); sp.setX(i, sp.getX(i) + Math.sin(time + i) * dt * 0.1);
+    }
+    sp.needsUpdate = true;
+  }
+  for (const p of presents) if (p.userData.grow !== undefined && p.userData.grow < 1) { p.userData.grow = Math.min(1, p.userData.grow + dt * 3); const g = p.userData.grow; p.scale.setScalar(g + Math.sin(g * Math.PI) * 0.25); }
+  if (sparkles) {
+    const pa = sparkles.geometry.attributes.position, v = sparkles.userData.v;
+    for (let i = 0; i < v.length; i++) { pa.setXYZ(i, pa.getX(i) + v[i][0] * dt, pa.getY(i) + v[i][1] * dt, pa.getZ(i) + v[i][2] * dt); v[i][1] -= dt * 1.2; }
+    pa.needsUpdate = true;
+    sparkles.userData.life -= dt; sparkles.material.opacity = clamp(sparkles.userData.life / 2.2, 0, 1);
+    if (sparkles.userData.life <= 0) { scene.remove(sparkles); sparkles = null; }
+  }
+  if (actx && game === 'playing') {
+    const fd = Math.hypot(7.5 - player.x, 0 - player.z) + Math.abs(player.floor) * 0.5;
+    const fv = clamp(1 - fd / 16, 0.03, 1);
+    fireGain.gain.value = 0.07 * fv;
+    if ((crackleT -= dt) <= 0) { crackleT = rand(0.05, 0.4); noiseBurst(rand(0.01, 0.04), rand(1500, 4500), 'bandpass', 0.25 * fv, 3); }
+  } else if (fireGain) fireGain.gain.value = 0;
+
+  if (flashT > 0) { flashT -= dt; flashLight.intensity = Math.max(0, flashT / 0.35) * 60; $('flash').style.opacity = Math.max(0, flashT / 0.35) * 0.9; }
+
+  camera.position.set(player.x, player.eye, player.z);
+  camera.rotation.set(pitch, yaw, 0);
+  renderer.render(scene, camera);
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+// Debug/testing hook
+window.__santa = { S, player, touch, setView: (y, p) => { yaw = y; pitch = p; }, setTimeScale: (t) => { timeScale = t; }, startGame, info: () => ({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles }),
+  sim: (seconds, dt = 1 / 60) => { for (let t = 0; t < seconds && game === 'playing'; t += dt) { updatePlayer(dt); updateSanta(dt); animateSanta(dt, t); } } };
+</script>
+</body>
+</html>
